@@ -1,0 +1,573 @@
+[
+  {
+    "key": "connection",
+    "label": "平台连接",
+    "groups": [
+      {
+        "label": "连接信息",
+        "settings": [
+          {
+            "key": "connection.cookie",
+            "label": "Cookie",
+            "type": "text",
+            "default": "",
+            "description": "管理平台登录 Cookie，用于 API 请求鉴权"
+          },
+          {
+            "key": "connection.apiBaseUrl",
+            "label": "API 地址",
+            "type": "text",
+            "default": "https://xmgl.cdrunnet.com/api/v3/work_packages",
+            "description": "任务管理平台 API 基础地址"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "validation",
+    "label": "任务校验",
+    "groups": [
+      {
+        "label": "校验参数",
+        "settings": [
+          {
+            "key": "validation.handlerName",
+            "label": "处理人",
+            "type": "text",
+            "default": "",
+            "compareCandidate": true,
+            "description": "任务处理人名称，用于校验和导出文件名"
+          }
+        ]
+      },
+      {
+        "label": "边界校验",
+        "settings": [
+          {
+            "key": "validation.boundaryMatchMode",
+            "label": "匹配模式",
+            "type": "combo",
+            "default": "any",
+            "options": [
+              {
+                "label": "任一匹配即通过",
+                "value": "any"
+              },
+              {
+                "label": "全部匹配才通过",
+                "value": "all"
+              }
+            ],
+            "description": "边界规则的判定模式：任一匹配（OR）或全部匹配（AND）"
+          },
+          {
+            "key": "validation.boundaryRules",
+            "label": "匹配规则",
+            "type": "comment_rules",
+            "default": [],
+            "description": "检查任务描述「边界」字段是否匹配指定内容。支持正则表达式。适用类型留空表示只检查「任务」。"
+          }
+        ]
+      },
+      {
+        "label": "评论区检查",
+        "settings": [
+          {
+            "key": "validation.commentMatchMode",
+            "label": "匹配模式",
+            "type": "combo",
+            "default": "all",
+            "options": [
+              {
+                "label": "任一匹配即通过",
+                "value": "any"
+              },
+              {
+                "label": "全部匹配才通过",
+                "value": "all"
+              }
+            ],
+            "description": "评论区规则的判定模式：任一匹配（OR）或全部匹配（AND）"
+          },
+          {
+            "key": "validation.commentRules",
+            "label": "匹配规则",
+            "type": "comment_rules",
+            "default": [
+              {
+                "enabled": true,
+                "label": "代码提交",
+                "pattern": "代码提交",
+                "isRegex": true
+              }
+            ],
+            "description": "检查任务评论区是否包含指定内容。添加多条规则，支持正则表达式。适用类型留空表示全部类型都检查。"
+          }
+        ]
+      },
+      {
+        "label": "校验规则",
+        "settings": [
+          {
+            "key": "validation.checkRules",
+            "label": "校验规则",
+            "type": "check_rules",
+            "default": [
+              {
+                "enabled": true,
+                "label": "任务标题",
+                "field": "subject",
+                "expected": "text",
+                "expectedKey": "rawTitle",
+                "compare": "equals"
+              },
+              {
+                "enabled": true,
+                "label": "项目名称",
+                "field": "_embedded.project.name",
+                "expected": "text",
+                "expectedKey": "rawProjectName",
+                "compare": "equals"
+              },
+              {
+                "enabled": true,
+                "label": "处理人",
+                "field": "_embedded.responsible.name",
+                "expected": "config",
+                "expectedKey": "validation.handlerName",
+                "compare": "equals"
+              },
+              {
+                "enabled": true,
+                "label": "所属部门",
+                "field": "customField106",
+                "expected": "none",
+                "compare": "regex-all",
+                "matchMode": "all",
+                "rules": []
+              },
+              {
+                "enabled": true,
+                "label": "任务状态",
+                "field": "_embedded.status.name",
+                "expected": "none",
+                "compare": "list-any",
+                "values": [
+                  "待检查",
+                  "已实现"
+                ]
+              },
+              {
+                "enabled": true,
+                "label": "自评时长",
+                "field": "estimatedTime",
+                "expected": "text",
+                "expectedKey": "rawScore",
+                "compare": "diff-hours",
+                "tolerance": 3
+              },
+              {
+                "enabled": true,
+                "label": "自评与预估偏差",
+                "field": "estimatedTime",
+                "expected": "none",
+                "compare": "field-diff",
+                "compareField": "customField105",
+                "tolerance": 3
+              },
+              {
+                "enabled": true,
+                "label": "预估时长",
+                "field": "customField105",
+                "expected": "text",
+                "expectedKey": "rawScore",
+                "compare": "equals",
+                "skipTypes": [
+                  "缺陷"
+                ]
+              },
+              {
+                "enabled": true,
+                "label": "前提条件",
+                "field": "description.raw",
+                "expected": "none",
+                "compare": "regex-any",
+                "matchMode": "any",
+                "skipTypes": [
+                  "缺陷"
+                ],
+                "rules": [
+                  {
+                    "enabled": true,
+                    "label": "前提条件",
+                    "pattern": "前提条件[：:]\\s*\\S",
+                    "isRegex": true
+                  }
+                ]
+              },
+              {
+                "enabled": true,
+                "label": "成果形式",
+                "field": "description.raw",
+                "expected": "none",
+                "compare": "regex-any",
+                "matchMode": "any",
+                "skipTypes": [
+                  "缺陷"
+                ],
+                "rules": [
+                  {
+                    "enabled": true,
+                    "label": "成果形式",
+                    "pattern": "成果形式[：:]\\s*\\S",
+                    "isRegex": true
+                  }
+                ]
+              },
+              {
+                "enabled": true,
+                "label": "自评时长下限",
+                "field": "estimatedTime",
+                "expected": "none",
+                "compare": "gte",
+                "expectedKey": "0.5"
+              },
+              {
+                "enabled": true,
+                "label": "预估时长下限",
+                "field": "customField105",
+                "expected": "none",
+                "compare": "gte",
+                "expectedKey": "0.5"
+              },
+              {
+                "enabled": true,
+                "label": "流程图",
+                "field": "description.raw",
+                "expected": "none",
+                "compare": "regex-any",
+                "matchMode": "any",
+                "skipTypes": [
+                  "缺陷"
+                ],
+                "rules": [
+                  {
+                    "enabled": true,
+                    "label": "包含图片",
+                    "pattern": "<img\\b|\\.(png|jpg|jpeg|gif|webp|bmp)\\b|/api/v3/attachments/\\d+/content",
+                    "isRegex": true
+                  }
+                ]
+              }
+            ],
+            "description": "逐字段校验：平台字段与文本任务/配置预期比对。字段、比对方式、容差、白名单、多条件（或/且）均可配置。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "ai",
+    "label": "AI 审查",
+    "groups": [
+      {
+        "label": "模型服务",
+        "settings": [
+          {
+            "key": "ai.enabled",
+            "label": "启用 AI 审查",
+            "type": "checkbox",
+            "default": false,
+            "description": "启用后，检查任务页面校验时由 AI 自动生成每个任务的审查结论（如「代码未提交」）"
+          },
+          {
+            "key": "ai.baseUrl",
+            "label": "接口地址",
+            "type": "text",
+            "default": "https://api.deepseek.com/v1",
+            "depends_on": "ai.enabled",
+            "description": "OpenAI 兼容的 chat completions 接口地址，支持 DeepSeek、公司内部网关等，如 https://api.deepseek.com/v1"
+          },
+          {
+            "key": "ai.apiKey",
+            "label": "API 密钥",
+            "type": "textarea",
+            "default": "",
+            "placeholder": "sk-...",
+            "depends_on": "ai.enabled",
+            "description": "接口鉴权密钥（Bearer），导出设置时自动脱敏"
+          },
+          {
+            "key": "ai.model",
+            "label": "模型名称",
+            "type": "text",
+            "default": "deepseek-chat",
+            "depends_on": "ai.enabled",
+            "description": "请求使用的模型名，如 deepseek-chat、deepseek-reasoner，或网关提供的模型名"
+          },
+          {
+            "key": "ai.timeoutSeconds",
+            "label": "请求超时",
+            "type": "spinbox",
+            "default": 120,
+            "min": 10,
+            "max": 600,
+            "step": 10,
+            "suffix": "秒",
+            "depends_on": "ai.enabled",
+            "description": "单次 AI 请求的超时时间，生成较慢时可调大"
+          }
+        ]
+      },
+      {
+        "label": "审查提示词",
+        "settings": [
+          {
+            "key": "ai.prompt",
+            "label": "提示词模板",
+            "type": "textarea",
+            "default": "你是任务完成情况审查员。根据以下任务信息审查任务是否已按要求完成，只输出审查结论文本。\n\n任务标题：{title}\n任务状态：{status}\n任务类型：{type}\n任务描述：\n{description}\n\n评论区内容：\n{comments}\n\n要求：\n1. 只输出审查结论，不超过 30 字，不要输出其他任何内容。\n2. 发现问题时直接指出问题本身，例如：代码未提交、评论未说明完成情况、缺少成果形式。\n3. 未发现明显问题时输出：审查通过。",
+            "description": "AI 审查提示词。占位符 {title} {status} {type} {description} {comments} 会自动替换为任务标题、状态、类型、描述与评论区内容，按提示词要求输出结论"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "parsing",
+    "label": "文本解析",
+    "groups": [
+      {
+        "label": "正则规则",
+        "settings": [
+          {
+            "key": "parsing.taskRegex",
+            "label": "导出解析正则",
+            "type": "regex",
+            "default": "(?<seq>\\d+)\\.【(?<estimatedHours>[\\d.]+)】(?<projectName>[^【]+?)【(?<remark>(?:[^】]|【[^】]*】)*?)】\\s*(?<url>https?:\\/\\/[^\\s】]+)\\s*【(?<score>[\\d.]+)】",
+            "description": "导出页面任务行解析正则，必须包含 seq/estimatedHours/projectName/remark/url/score 六个具名组"
+          },
+          {
+            "key": "parsing.groupRegex",
+            "label": "提取解析正则",
+            "type": "regex",
+            "default": "(?<seq>\\d+)\\.(?:【(?<estimatedHours>[\\d.]+)】)?(?<projectName>[^【]+?)【(?<remark>(?:[^】]|【[^】]*】)*?)】\\s*(?<url>https?:\\/\\/[^\\s【】]+)?\\s*【?(?<score>[\\d.]+)】?",
+            "description": "提取页面任务行解析正则，须包含 seq/estimatedHours/projectName/remark/url/score 六个具名组（estimatedHours 可选）；处理人从 remark 末段 - 后提取"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "export",
+    "label": "导出配置",
+    "groups": [
+      {
+        "label": "周报导出",
+        "settings": [
+          {
+            "key": "export.templatePath",
+            "label": "模板路径",
+            "type": "text",
+            "default": "",
+            "description": "周报 Excel 模板文件路径，留空则使用内置模板"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "history",
+    "label": "任务历史",
+    "groups": [
+      {
+        "label": "自动同步",
+        "settings": [
+          {
+            "key": "history.autoSyncEnabled",
+            "label": "启用自动同步",
+            "type": "checkbox",
+            "default": false,
+            "description": "日期范围包含当天时，定时同步管理平台数据并执行检查"
+          },
+          {
+            "key": "history.autoSyncInterval",
+            "label": "同步间隔",
+            "type": "spinbox",
+            "default": 5,
+            "min": 1,
+            "max": 60,
+            "step": 1,
+            "suffix": "分钟",
+            "depends_on": "history.autoSyncEnabled",
+            "description": "自动同步的时间间隔"
+          },
+          {
+            "key": "history.autoSyncAutoCheck",
+            "label": "同步后检查",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "history.autoSyncEnabled",
+            "description": "同步完成后自动执行检查"
+          }
+        ]
+      },
+      {
+        "label": "备份设置",
+        "settings": [
+          {
+            "key": "history.backupEnabled",
+            "label": "自动备份",
+            "type": "checkbox",
+            "default": false,
+            "description": "定时将历史数据复制到备份目录"
+          },
+          {
+            "key": "history.backupInterval",
+            "label": "备份间隔",
+            "type": "spinbox",
+            "default": 60,
+            "min": 10,
+            "max": 1440,
+            "step": 10,
+            "suffix": "分钟",
+            "description": "自动备份的时间间隔",
+            "depends_on": "history.backupEnabled"
+          },
+          {
+            "key": "history.backupDirectories",
+            "label": "备份目录",
+            "type": "directories",
+            "default": [],
+            "description": "添加一个或多个备份目标目录，系统会定期将历史数据复制到这些目录",
+            "depends_on": "history.backupEnabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "notification",
+    "label": "系统通知",
+    "groups": [
+      {
+        "label": "通知设置",
+        "settings": [
+          {
+            "key": "notification.enabled",
+            "label": "启用系统通知",
+            "type": "checkbox",
+            "default": true,
+            "description": "同步、检查等耗时操作完成后弹出 Windows 系统通知"
+          },
+          {
+            "key": "notification.onSyncCompleted",
+            "label": "同步完成通知",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "notification.enabled",
+            "description": "历史任务同步完成后弹出通知"
+          },
+          {
+            "key": "notification.onCheckCompleted",
+            "label": "检查完成通知",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "notification.enabled",
+            "description": "历史任务检查完成后弹出通知"
+          },
+          {
+            "key": "notification.onlyWhenBackground",
+            "label": "仅在后台时通知",
+            "type": "checkbox",
+            "default": false,
+            "depends_on": "notification.enabled",
+            "description": "窗口处于前台聚焦时不弹通知，最小化或失去焦点时才弹"
+          },
+          {
+            "key": "notification.silent",
+            "label": "静默通知",
+            "type": "checkbox",
+            "default": false,
+            "depends_on": "notification.enabled",
+            "description": "通知不播放系统提示音"
+          },
+          {
+            "key": "notification.timeoutType",
+            "label": "显示时长",
+            "type": "combo",
+            "default": "default",
+            "options": [
+              {
+                "label": "系统默认",
+                "value": "default"
+              },
+              {
+                "label": "常驻显示",
+                "value": "never"
+              }
+            ],
+            "depends_on": "notification.enabled",
+            "description": "通知在通知中心停留的时间，常驻显示需手动关闭"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "appearance",
+    "label": "系统界面",
+    "groups": [
+      {
+        "label": "主题",
+        "settings": [
+          {
+            "key": "appearance.theme",
+            "label": "界面主题",
+            "type": "combo",
+            "default": "dark",
+            "options": [
+              {
+                "label": "暗色主题",
+                "value": "dark"
+              },
+              {
+                "label": "亮色主题",
+                "value": "light"
+              }
+            ],
+            "description": "选择程序整体外观主题，暗色护眼、亮色清晰"
+          }
+        ]
+      },
+      {
+        "label": "日志面板",
+        "settings": [
+          {
+            "key": "appearance.logPanelHeight",
+            "label": "面板高度",
+            "type": "spinbox",
+            "default": 200,
+            "min": 60,
+            "max": 800,
+            "step": 10,
+            "suffix": "px",
+            "description": "底部日志面板的初始高度"
+          },
+          {
+            "key": "appearance.logMaxLines",
+            "label": "最大行数",
+            "type": "spinbox",
+            "default": 500,
+            "min": 100,
+            "max": 10000,
+            "step": 100,
+            "suffix": "行",
+            "description": "超过此数量后自动丢弃旧日志"
+          }
+        ]
+      }
+    ]
+  }
+]

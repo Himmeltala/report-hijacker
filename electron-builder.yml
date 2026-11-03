@@ -1,0 +1,49 @@
+# electron-builder 配置：把应用打成 Windows 目录再生成 NSIS 安装包（取代原来的 electron-forge 与 Squirrel）
+#
+# 只出一种安装包：所有用户。perMachine 为 true 时 assistedInstaller.nsh 不插入安装范围选择页，
+# 安装范围固定为所有用户，用户改不了；安装目录仍由目录选择页决定。
+# 安装包文件名由 scripts/make-win.js 用 -c.nsis.artifactName 传入。
+
+appId: com.zhengrenfu.taskmanager
+productName: TaskManager
+
+directories:
+  # 默认值是 dist，与 vite 的渲染进程产物目录同名。留默认值会让 electron-builder 把 dist 当成输出目录
+  # 并从打包文件里排除掉，最后打出一个空的 app.asar，所以必须显式指定
+  output: out
+  # 图标默认目录，放 build/icon.ico 即自动生效，不放就用 Electron 默认图标并打一句告警
+  buildResources: build
+
+# 只把运行时真正需要的三个东西放进 app.asar。
+# 这里管不到 node_modules：electron-builder 按 package.json 的生产依赖单独收集，不受本列表约束
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+
+# assets 放到 resources/assets，与原来 forge 的 extraResource 布局一致，
+# 因此 electron/utils.ts 与 excelService.ts 里三候选探测的第二条继续命中，运行时代码不用改
+extraResources:
+  - from: assets
+    to: assets
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  # 所有用户安装：装到 Program Files、写 HKLM 注册表，安装时弹 UAC
+  perMachine: true
+  # 关掉一键安装，走向导：有许可页与目录选择页
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+  # 快捷方式名与卸载列表用中文；productName 保持英文，存储路径与安装目录跟着它
+  shortcutName: 任务管理器
+  uninstallDisplayName: 任务管理器

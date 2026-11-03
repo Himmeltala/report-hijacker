@@ -1,0 +1,232 @@
+/*
+ * @Author: zhengrenfu
+ * @Date: 2026-07-14 01:23:28
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-07-14 12:14:04
+ * @FilePath: \..\\src\\types\\ipc.ts
+ * @Description: 描述
+ */
+
+import type { ValidationResult, CommentRuleMatch } from '@/types/task'
+import type { ActivitiesResponse, NotificationsResponse } from '@/types/api'
+import type { CommentRule, CheckRule } from '@/types/config'
+import type { ReadonlyRawWorkPackage } from '@/types/remote'
+
+export interface HistoryTaskItem {
+  serId: string
+  serDate: string
+  rawSeq: number
+  rawProjectName: string
+  rawTitle: string
+  rawHandler: string
+  rawUrl: string
+  rawScore: string
+  rawEstimatedHours: string
+  rawRemark: string
+  rawText: string
+  serSyncStatus: 'none' | 'synced'
+  serWorkPackageId: string | null
+  /** 远程原始数据（只读，禁止修改，平台字段原封不动） */
+  remote: ReadonlyRawWorkPackage | null
+  serSyncedAt: string | null
+  serCheckResult: ValidationResult | null
+  serCommentCheckResult: CommentRuleMatch[] | null
+  /** 任务优先级：高、中、低 */
+  serPriority: 'high' | 'medium' | 'low' | null
+  /** 限时任务：今日、临时 */
+  serTimeLimit: 'today' | 'temp' | null
+  /** 是否为延期任务（本地标记） */
+  serPostponed: boolean
+  /** 延期原因 */
+  serPostponedReason: string
+  serCreatedAt: string
+  serUpdatedAt: string
+}
+
+export interface HistoryDay {
+  date: string
+  tasks: HistoryTaskItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ValidateTaskParams {
+  rawSeq: string
+  rawProjectName: string
+  rawTitle: string
+  rawScore: string
+  rawEstimatedHours: string
+  rawRemark: string
+  rawUrl: string
+  cookie: string
+  handlerName: string
+  boundaryRules: CommentRule[]
+  boundaryMatchMode?: string
+  checkRules?: CheckRule[]
+  taskDate?: string
+}
+
+export interface CheckCommentsParams {
+  taskId: string
+  cookie: string
+}
+
+export interface AiReviewParams {
+  taskId: string
+  cookie: string
+}
+
+export interface OpenFileParams {
+  filters?: { name: string; extensions: string[] }[]
+  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+}
+
+export interface SaveFileParams {
+  defaultName: string
+  filters?: { name: string; extensions: string[] }[]
+}
+
+export interface FillExcelTemplateParams {
+  tasks: any[]
+  templatePath?: string
+  targetPath: string
+  handlerName: string
+  cookie: string
+  validationResults?: any[]
+}
+
+export interface WriteTextFileParams {
+  filePath: string
+  content: string
+}
+
+export interface FetchNotificationsParams {
+  cookie: string
+  onlyUnread?: boolean
+  pageSize?: number
+  offset?: number
+}
+
+export interface MarkNotificationReadParams {
+  id: number
+  cookie: string
+}
+
+export interface MarkNotificationsReadParams {
+  ids: number[]
+  cookie: string
+}
+
+export interface FillExcelTemplateResult {
+  success: boolean
+  filePath?: string
+  error?: string
+}
+
+export interface IpcApi {
+  // 设置
+  getSetting: (key: string) => Promise<any>
+  getSettingsAll: () => Promise<Record<string, any>>
+  setSetting: (key: string, value: any) => Promise<void>
+  getSettingsSchema: () => Promise<any[]>
+  exportSettings: () => Promise<{ success: boolean; filePath?: string }>
+  importSettings: () => Promise<{ success: boolean } | null>
+  onThemeChanged: (callback: (theme: string) => void) => () => void
+  onMenuEvent: (callback: (data: { action: string }) => void) => () => void
+
+  // 通用数据存储
+  storeGet: (key: string) => Promise<any>
+  storeSet: (key: string, value: any) => Promise<void>
+  storeDelete: (key: string) => Promise<void>
+  storeKeys: () => Promise<string[]>
+
+  // 校验任务
+  validateTask: (params: ValidateTaskParams) => Promise<ValidationResult>
+
+  // 评论区检查
+  checkComments: (params: CheckCommentsParams) => Promise<ActivitiesResponse>
+
+  // AI 审查
+  aiReview: (params: AiReviewParams) => Promise<{ conclusion: string }>
+
+  // 通知
+  fetchNotifications: (params: FetchNotificationsParams) => Promise<NotificationsResponse>
+  // 主进程实际返回 { success, data } 结构，类型与实现保持一致
+  markNotificationRead: (params: MarkNotificationReadParams) => Promise<{ success: boolean; data?: any }>
+  markNotificationsRead: (params: MarkNotificationsReadParams) => Promise<{ success: boolean; data?: any }>
+
+  // 系统通知
+  showSysNotification: (params: {
+    title: string
+    body: string
+    silent?: boolean
+    timeoutType?: 'default' | 'never'
+  }) => Promise<{ success: boolean; reason?: string }>
+
+  // 文件对话框
+  openFile: (params: OpenFileParams) => Promise<string | null>
+  saveFile: (params: SaveFileParams) => Promise<string | null>
+
+  // 文件读写
+  writeTextFile: (params: WriteTextFileParams) => Promise<void>
+  fillExcelTemplate: (params: FillExcelTemplateParams) => Promise<FillExcelTemplateResult>
+
+  // 历史任务
+  listHistoryDates: (range?: { startDate?: string; endDate?: string }) => Promise<string[]>
+  getHistoryDate: (date: string) => Promise<HistoryDay | null>
+  saveHistoryDate: (date: string, data: any) => Promise<void>
+  batchSaveHistory: (batch: Array<{ date: string; data: HistoryDay }>) => Promise<void>
+  deleteHistoryDate: (date: string) => Promise<void>
+  queryHistory: (params: { startDate?: string; endDate?: string; keyword?: string }) => Promise<HistoryDay[]>
+  syncHistoryTasks: (
+    tasks: any[],
+    cookie: string,
+  ) => Promise<
+    Array<{
+      taskId: string
+      workPackageId: string | null
+      exists: boolean
+      /** 远程原始数据（只读） */
+      remote: ReadonlyRawWorkPackage | null
+      error?: string
+    }>
+  >
+
+  restoreHistoryFromDir: () => Promise<{
+    /** 成功恢复的历史文件数 */
+    count: number
+    /** 源目录里存在多份来源的日期个数 */
+    conflictCount: number
+  }>
+  backupNow: (
+    dirs?: string[],
+  ) => Promise<{ success: boolean; message?: string; count?: number; total?: number; time?: string }>
+  migrateHistoryLayout: () => Promise<{
+    /** 扫描到的待迁移文件数 */
+    total: number
+    /** 成功搬进年/月目录的文件数 */
+    moved: number
+    /** 目标位置已有同名文件而跳过的数量 */
+    skipped: number
+    /** 迁移失败的数量 */
+    failed: number
+  }>
+
+  // 用户档案管理
+  profileCurrent: () => Promise<string>
+  profileList: () => Promise<string[]>
+  profileSwitch: (name: string) => Promise<void>
+  profileAdd: (name: string) => Promise<string[]>
+  profileRename: (oldName: string, newName: string) => Promise<string[]>
+  profileDelete: (name: string) => Promise<string[]>
+  onProfileSwitched: (callback: (name: string) => void) => () => void
+  onAutoSyncSettingsChanged: (callback: () => void) => () => void
+  onBackupCompleted: (callback: () => void) => () => void
+}
+
+declare global {
+  // eslint-disable-next-line no-unused-vars
+  interface Window {
+    electron: IpcApi
+  }
+}
