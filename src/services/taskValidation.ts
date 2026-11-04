@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-04 23:59:29
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-04 16:30:00
  * @FilePath: \src\services\taskValidation.ts
  * @Description: 任务取数与 AI 审查编排服务
  */
@@ -91,10 +91,24 @@ function hoursText(raw: any): string {
 }
 
 /**
+ * 平台任务日期区间转文本，供 AI 判断今天是否落在区间内
+ * @param {any} remote 平台任务原始数据
+ * @returns {string} 区间文本，起止日期都为空时返回空字符串
+ */
+function dateRangeText(remote: any): string {
+  const start = remote?.startDate ? String(remote.startDate) : ''
+  const due = remote?.dueDate ? String(remote.dueDate) : ''
+  if (start && due) return `${start} 至 ${due}`
+  if (start) return `${start} 起（结束日期未填）`
+  if (due) return `截至 ${due}（开始日期未填）`
+  return ''
+}
+
+/**
  * 对单条任务执行 AI 审查：读取模块提示词模板，任务上下文替换占位符后调用 AI 通道
  * @param {TaskDetailResult} result 任务详情（remote 含平台原始数据）
  * @param {string | null} commentText 评论区文本，null 表示取数异常
- * @param {{ handlerName?: string; departmentName?: string; taskDate?: string }} expected 设置中的预期处理人、所属部门与任务日期
+ * @param {{ handlerName?: string; departmentName?: string; taskDate?: string }} expected 设置中的预期处理人、所属部门与文本任务日期（平台无起止日期时兜底）
  * @returns {Promise<{ conclusion: string; prompt: string; reasoning: string }>} 审查结论、发送的提示词与思考过程
  */
 async function runAiReview(
@@ -110,7 +124,8 @@ async function runAiReview(
     title: remote?.subject || '',
     status: embedded.status?.name || remote?._links?.status?.title || '',
     type: embedded.type?.name || remote?._links?.type?.title || '',
-    date: expected.taskDate || '',
+    // 日期用平台起止日期组成区间，平台未填时退回文本里的任务日期
+    date: dateRangeText(remote) || expected.taskDate || '',
     today: todayText(),
     responsible: embedded.responsible?.name || remote?._links?.responsible?.title || '',
     expectedHandler: expected.handlerName || '',
