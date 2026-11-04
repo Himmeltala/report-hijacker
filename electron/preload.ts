@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-13 00:26:38
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-04 16:45:00
  * @FilePath: \electron\preload.ts
  * @Description: 预加载脚本，通过 contextBridge 暴露 IPC 接口
  */
@@ -87,7 +87,6 @@ contextBridge.exposeInMainWorld('electron', {
   applyUpdate: (params: any) => ipcRenderer.invoke('update:apply', params),
   onUpdateAvailable: (callback: (data: any) => void) => subscribe('event:updateAvailable', callback),
   onUpdateProgress: (callback: (data: any) => void) => subscribe('event:updateProgress', callback),
-  onUpdateFailed: (callback: (data: { error: string }) => void) => subscribe('event:updateFailed', callback),
   // #endregion
 
   // #region 事件监听

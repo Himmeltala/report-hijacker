@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-04 16:45:00
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: 描述
  */
@@ -211,7 +211,6 @@ export interface IpcApi {
   applyUpdate: (params: UpdateApplyParams) => Promise<UpdateApplyResult>
   onUpdateAvailable: (callback: (data: UpdateCheckResult) => void) => () => void
   onUpdateProgress: (callback: (data: UpdateProgress) => void) => () => void
-  onUpdateFailed: (callback: (data: { error: string }) => void) => () => void
   onAutoSyncSettingsChanged: (callback: () => void) => () => void
   onBackupCompleted: (callback: () => void) => () => void
 }

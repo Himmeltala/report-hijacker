@@ -2,14 +2,13 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 15:40:00
+ * @LastEditTime: 2026-11-04 16:45:00
  * @FilePath: \electron\services\updateService.ts
  * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后启动安装程序
  */
 
-import { app, ipcMain, BrowserWindow } from 'electron'
+import { app, ipcMain, BrowserWindow, shell } from 'electron'
 import { createHash } from 'crypto'
-import { spawn } from 'child_process'
 import { Readable } from 'stream'
 import {
   createReadStream,
@@ -359,18 +358,26 @@ function buildStatus(deps: UpdateDeps): UpdateStatus {
 
 // #region 应用更新
 
-/** 启动安装程序并退出本程序，安装完成后由 NSIS 的 runAfterFinish 打开新版 */
-function launchInstaller(deps: UpdateDeps, file: string): void {
-  const child = spawn(file, [], { detached: true, stdio: 'ignore' })
-  // 启动失败时保留本程序，让用户能看到失败原因
-  child.on('error', (e) => {
-    installing = false
-    sendToWindow(deps, 'event:updateFailed', { error: e.message })
-  })
-  child.unref()
+/**
+ * 用系统 Shell 启动安装程序并安排本程序退出，安装完成后由 NSIS 的 runAfterFinish 打开新版
+ *
+ * 安装包按所有用户安装，清单要求管理员权限，直接 spawn 会因未提权返回 EACCES，
+ * 改由 ShellExecute 启动，由系统弹 UAC 提权。
+ * @param {string} file 安装包路径
+ * @returns {Promise<string>} 启动失败原因，成功返回空字符串
+ */
+async function launchInstaller(file: string): Promise<string> {
+  try {
+    // 用户取消 UAC 提权时这里会返回错误，保留本程序让用户看到原因
+    const error = await shell.openPath(file)
+    if (error) return error
+  } catch (e: any) {
+    return e?.message || '未知错误'
+  }
   setTimeout(() => {
     if (installing) app.quit()
   }, QUIT_DELAY_MS)
+  return ''
 }
 
 /**
@@ -418,7 +425,14 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
     writeState(state)
 
     installing = true
-    launchInstaller(deps, target)
+    const launchError = await launchInstaller(target)
+    if (launchError) {
+      installing = false
+      // 安装没有开始，清掉待定记录，避免下次启动误记为已安装
+      delete state.pending
+      writeState(state)
+      return { started: false, error: `安装程序启动失败: ${launchError}` }
+    }
     return { started: true }
   } catch (e: any) {
     return { started: false, error: e?.message || '更新失败' }

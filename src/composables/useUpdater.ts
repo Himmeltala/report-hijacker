@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:19:46
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 15:45:00
+ * @LastEditTime: 2026-11-04 16:45:00
  * @FilePath: \src\composables\useUpdater.ts
  * @Description: 应用更新的检查、确认与安装编排
  */
@@ -114,14 +114,8 @@ export function useUpdater() {
   const offProgress = window.electron?.onUpdateProgress?.((p: UpdateProgress) => {
     progress.value = p
   })
-  // 安装程序启动失败时主进程会保留窗口并推送原因
-  const offFailed = window.electron?.onUpdateFailed?.(({ error }) => {
-    applying.value = false
-    logStore.addLog('error', `安装程序启动失败: ${error}`)
-  })
   onScopeDispose(() => {
     offProgress?.()
-    offFailed?.()
   })
 
   return { status, checking, applying, progress, loadStatus, runCheck, offerUpdate }
