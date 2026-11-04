@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:45:00
+ * @LastEditTime: 2026-11-04 16:43:00
  * @FilePath: \electron\services\updateService.ts
  * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后启动安装程序
  */
@@ -259,15 +259,20 @@ function createProgressReporter(send: (p: UpdateProgress) => void): (p: UpdatePr
 
 // #region 检查更新
 
-/** 共享盘方式检查：比较安装包 MD5 与本地已安装包 MD5 */
+/**
+ * 共享盘方式检查：取目录里最新的安装包，只按包 MD5 判断是否与已安装的是同一个文件
+ * @param {string} sharePath 设置里的共享盘路径
+ * @param {string} installedMd5 已安装包的 MD5，为空表示还没有记录
+ * @returns {Promise<CheckPayload>} 检查结果
+ */
 async function checkShare(sharePath: string, installedMd5: string): Promise<CheckPayload> {
   const installer = resolveShareInstaller(sharePath)
   const md5 = await md5File(installer.filePath)
   const version = parseVersion(installer.fileName)
-  // 首次检查没有 MD5 记录，且共享盘包版本与当前版本一致时视为已安装，避免刚装好就提示更新
-  const initialized = !installedMd5 && !!version && version === app.getVersion()
+  // 还没有记录时先把当前包的 MD5 补成基线，此时不提示；之后 MD5 变了才提示更新
+  const hasUpdate = !!installedMd5 && md5 !== installedMd5
   return {
-    hasUpdate: !initialized && md5 !== installedMd5,
+    hasUpdate,
     source: 'share',
     version,
     fileName: installer.fileName,
@@ -329,7 +334,7 @@ async function checkForUpdate(deps: UpdateDeps): Promise<UpdateCheckResult> {
   } catch (e: any) {
     payload = { hasUpdate: false, source, error: e?.message || '检查更新失败' }
   }
-  // 首次检查没有 MD5 记录且已是最新时，把当前安装包 MD5 补记为已安装
+  // 还没有 MD5 记录时，把这次检查到的包记为已安装基线，避免刚装好就提示更新
   if (!state.installedMd5 && payload.md5 && !payload.hasUpdate) {
     state.installedMd5 = payload.md5
     state.installedVersion = app.getVersion()
