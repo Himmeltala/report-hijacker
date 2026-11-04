@@ -11,14 +11,17 @@
 !macroend
 
 # 紧跟安装页声明之前设置 SHOW 回调，页面显示时先把安装信息写进日志面板
-!macro customPageAfterChangeDir
-  !define MUI_PAGE_CUSTOMFUNCTION_SHOW ShowInstallDetails
-!macroend
+# 卸载器编译（BUILD_UNINSTALLER）不会展开安装页，函数留在里面会触发未引用告警
+!ifndef BUILD_UNINSTALLER
+  !macro customPageAfterChangeDir
+    !define MUI_PAGE_CUSTOMFUNCTION_SHOW ShowInstallDetails
+  !macroend
 
-Function ShowInstallDetails
-  DetailPrint "正在安装 ${PRODUCT_NAME} ${VERSION}..."
-  DetailPrint "安装目录：$INSTDIR"
-FunctionEnd
+  Function ShowInstallDetails
+    DetailPrint "正在安装 ${PRODUCT_NAME} ${VERSION}..."
+    DetailPrint "安装目录：$INSTDIR"
+  FunctionEnd
+!endif
 
 # 模板在安装页开始时关闭了明细输出，这里重新打开并输出安装阶段结果
 !macro customInstall
