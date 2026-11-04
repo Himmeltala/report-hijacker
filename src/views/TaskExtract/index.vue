@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:22
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04 12:14:04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\views\TaskExtract\index.vue
  * @Description: 描述
 -->
@@ -92,10 +92,10 @@
               <span v-else class="text-muted">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="校验" align="center" min-width="100">
+          <el-table-column label="取数" align="center" min-width="100">
             <template #default="{ $index }">
-              <el-tag v-if="syncResults[$index]" :type="syncResults[$index].serValid ? 'success' : 'danger'">
-                {{ syncResults[$index].serValid ? '通过' : '异常' }}
+              <el-tag v-if="syncResults[$index]" :type="syncResults[$index].remote ? 'success' : 'danger'">
+                {{ syncResults[$index].remote ? '已获取' : '异常' }}
               </el-tag>
               <span v-else class="text-muted">-</span>
             </template>
@@ -172,11 +172,10 @@ import { Document, CopyDocument, Delete, Collection, Connection } from '@element
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
-import { validateBatch, type TaskToValidate } from '@/services/taskValidation'
-import { isRulesPassed, failedRuleLabels } from '@/services/validationRules'
+import { reviewBatch, type TaskToValidate } from '@/services/taskValidation'
 import { mergeTasksIntoHistory } from '@/services/historyPersistence'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
-import type { ValidationResult, CommentRuleMatch } from '@/types/task'
+import type { TaskDetailResult } from '@/types/task'
 import type { HistoryTaskItem } from '@/types/ipc'
 import { statusTagType, evalTagType, taskTypeTagType } from '@/utils/tag'
 import ParseInput from '@/components/ParseInput.vue'
@@ -208,8 +207,7 @@ const unrecognizedLines = ref<string[]>([])
 const allTasks = ref<ExtractTaskItem[]>([])
 const extractedTasks = ref<ExtractTaskItem[]>([])
 const syncing = ref(false)
-const syncResults = ref<(ValidationResult | null)[]>([])
-const commentCheckResults = ref<(CommentRuleMatch[] | null)[]>([])
+const syncResults = ref<(TaskDetailResult | null)[]>([])
 // 任务集合代际计数，解析或清空时递增，用于丢弃在途同步的过期结果
 let parseEpoch = 0
 // #endregion
@@ -222,9 +220,9 @@ const totalHours = computed(() => {
   return Math.round(sum * 100) / 100
 })
 
-// 按同步结果统计实际通过数与失败数，未同步时均为 0
-const syncValidCount = computed(() => syncResults.value.filter((r) => r?.serValid).length)
-const syncInvalidCount = computed(() => syncResults.value.filter((r) => r && !r.serValid).length)
+// 按取数结果统计成功与异常数，未同步时均为 0
+const syncValidCount = computed(() => syncResults.value.filter((r) => !!r?.remote).length)
+const syncInvalidCount = computed(() => syncResults.value.filter((r) => !!r && !r.remote).length)
 // #endregion
 
 // #region 解析
@@ -250,7 +248,6 @@ function doParse() {
     unrecognizedLines.value = []
     extractedTasks.value = []
     syncResults.value = []
-    commentCheckResults.value = []
     return
   }
 
@@ -260,7 +257,6 @@ function doParse() {
     unrecognizedLines.value = []
     extractedTasks.value = []
     syncResults.value = []
-    commentCheckResults.value = []
     return
   }
 
@@ -310,7 +306,6 @@ function doParse() {
   allTasks.value = parsed
   // 任务集合变化后旧的同步结果按索引已错位，必须清空
   syncResults.value = []
-  commentCheckResults.value = []
   // 任务集合代际递增，使在途同步识别到表格已变更并放弃过期结果
   parseEpoch++
 
@@ -365,11 +360,7 @@ function handleParse() {
 function showDetail(index: number) {
   const result = syncResults.value[index]
   if (result) {
-    detailModal.open({
-      result,
-      commentResult: commentCheckResults.value[index] ?? null,
-      commentMatchMode: store.config.commentMatchMode || 'all',
-    })
+    detailModal.open({ result })
   }
 }
 
@@ -377,8 +368,7 @@ async function handleSync() {
   const tasks = extractedTasks.value
   if (!tasks.length) return
 
-  const { cookie, handlerName, checkRules, boundaryRules, boundaryMatchMode, commentRules, commentMatchMode } =
-    store.config
+  const { cookie, handlerName } = store.config
   if (!cookie) {
     logStore.addLog('warning', '请先在设置中填写 Cookie')
     return
@@ -386,7 +376,6 @@ async function handleSync() {
 
   syncing.value = true
   syncResults.value = []
-  commentCheckResults.value = []
   const epoch = parseEpoch
 
   try {
@@ -400,17 +389,9 @@ async function handleSync() {
       rawUrl: t.rawUrl,
     }))
 
-    const outcomes = await validateBatch(
+    const outcomes = await reviewBatch(
       ttv,
-      {
-        cookie,
-        handlerName,
-        checkRules: checkRules || [],
-        boundaryRules,
-        boundaryMatchMode,
-        commentRules: commentRules || [],
-        commentMatchMode: commentMatchMode || 'all',
-      },
+      { cookie, handlerName },
       {
         onTaskStart: (i, total, task) => {
           logStore.addLog('info', `[${i + 1}/${total}] 同步: ${task.rawProjectName} - ${task.rawTitle}`)
@@ -425,31 +406,26 @@ async function handleSync() {
     }
 
     // 按原索引写入结果与日志
-    let validCount = 0
+    let fetched = 0
     for (const o of outcomes) {
       if (o.error) {
-        logStore.addLog('error', `[${o.index + 1}] 同步异常: ${o.error.message}`)
+        logStore.addLog('error', `[${o.index + 1}] 同步失败: ${o.error.message}`)
         continue
       }
       syncResults.value[o.index] = o.result
-      if (o.result?.serValid) validCount++
-      logStore.addLog(
-        o.result?.serValid ? 'success' : 'warning',
-        `[${o.index + 1}] ${o.result?.serValid ? '通过' : '异常'}`,
-      )
-      if (o.commentMatches) {
-        commentCheckResults.value[o.index] = o.commentMatches
-        if (!isRulesPassed(o.commentMatches, commentMatchMode || 'all')) {
-          logStore.addLog('warning', `[${o.index + 1}] 评论区未通过: ${failedRuleLabels(o.commentMatches)}`)
-        }
+      if (o.result?.serError) {
+        logStore.addLog('error', `[${o.index + 1}] ${o.result.serError}`)
+        continue
       }
+      fetched++
+      logStore.addLog('success', `[${o.index + 1}] 已获取平台数据`)
     }
-    logStore.addLog('success', `同步完成: ${validCount}/${ttv.length} 条`)
+    logStore.addLog('success', `同步完成: ${fetched}/${ttv.length} 条`)
   } finally {
-    // 无论成功、中止还是异常，都必须恢复按钮状态避免永久 loading
     syncing.value = false
   }
 }
+
 // #endregion
 
 // #region 自动解析（防抖）
@@ -519,7 +495,7 @@ async function doSaveHistory(dateStr: string) {
   const now = new Date().toISOString()
 
   const tasks: HistoryTaskItem[] = extractedTasks.value.map((t, i) => {
-    // 同步过的任务保留远程数据与校验结果，避免保存历史后回到未同步状态
+    // 同步过的任务保留远程数据，避免保存历史后回到未同步状态
     const syncResult = syncResults.value[i] ?? null
     const remote = syncResult?.remote ?? null
     const synced = !!remote
@@ -540,8 +516,6 @@ async function doSaveHistory(dateStr: string) {
       serWorkPackageId: syncResult?.serTaskId || null,
       remote: remote,
       serSyncedAt: synced ? now : null,
-      serCheckResult: synced ? syncResult : null,
-      serCommentCheckResult: synced ? (commentCheckResults.value[i] ?? null) : null,
       serPriority: null,
       serTimeLimit: null,
       serPostponed: false,
@@ -571,7 +545,6 @@ function handleClear() {
   allTasks.value = []
   extractedTasks.value = []
   syncResults.value = []
-  commentCheckResults.value = []
   // 任务集合代际递增，使在途同步识别到表格已清空并放弃过期结果
   parseEpoch++
   // 仅清本页数据，日志面板为全局共享，不清空其他页面的操作记录

@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-09-14 10:00:00
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-10-30 09:58:14
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: /src/views/HistoryTask/components/FilterBar.vue
  * @Description: 历史任务筛选栏组件，常驻区做粗略筛选，展开区做精细筛选；条件变更不触发查询，点击搜索按钮后才执行
 -->
@@ -92,13 +92,6 @@
           <el-col :span="4">
             <el-select v-model="model.filterStatus" placeholder="平台状态" clearable>
               <el-option v-for="v in platformStatusOptions" :key="v" :label="v" :value="v" />
-            </el-select>
-          </el-col>
-          <el-col :span="4">
-            <el-select v-model="model.filterValid" placeholder="校验" clearable>
-              <el-option label="通过" value="pass" />
-              <el-option label="异常" value="fail" />
-              <el-option label="未检查" value="uncheck" />
             </el-select>
           </el-col>
         </el-row>
@@ -212,7 +205,6 @@ export interface FilterState {
   filterSyncStatus: string
   filterStatus: string
   filterType: string
-  filterValid: string
   filterEval: string
   expanded: boolean
   filterAddedDate: string[]
@@ -234,7 +226,6 @@ export function createDefaultFilterState(): FilterState {
     filterSyncStatus: '',
     filterStatus: '',
     filterType: '',
-    filterValid: '',
     filterEval: '',
     expanded: false,
     filterAddedDate: [],
@@ -269,7 +260,6 @@ const PERSISTED_KEYS = [
   'filterSyncStatus',
   'filterStatus',
   'filterType',
-  'filterValid',
   'filterEval',
   'filterAddedDate',
   'filterProjects',

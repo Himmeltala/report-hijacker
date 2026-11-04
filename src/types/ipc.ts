@@ -2,15 +2,21 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-07-14 12:14:04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: 描述
  */
 
-import type { ValidationResult, CommentRuleMatch } from '@/types/task'
+import type { TaskDetailResult } from '@/types/task'
 import type { ActivitiesResponse, NotificationsResponse } from '@/types/api'
-import type { CommentRule, CheckRule } from '@/types/config'
 import type { ReadonlyRawWorkPackage } from '@/types/remote'
+import type {
+  UpdateApplyParams,
+  UpdateApplyResult,
+  UpdateCheckResult,
+  UpdateProgress,
+  UpdateStatus,
+} from '@/types/update'
 
 export interface HistoryTaskItem {
   serId: string
@@ -29,8 +35,8 @@ export interface HistoryTaskItem {
   /** 远程原始数据，只读，平台字段原封不动 */
   remote: ReadonlyRawWorkPackage | null
   serSyncedAt: string | null
-  serCheckResult: ValidationResult | null
-  serCommentCheckResult: CommentRuleMatch[] | null
+  /** AI 审查结论，未执行 AI 审查时为 null */
+  serAiConclusion?: string | null
   /** 任务优先级：高、中、低 */
   serPriority: 'high' | 'medium' | 'low' | null
   /** 限时任务：今日、临时 */
@@ -49,20 +55,9 @@ export interface HistoryDay {
   updatedAt: string
 }
 
-export interface ValidateTaskParams {
-  rawSeq: string
-  rawProjectName: string
-  rawTitle: string
-  rawScore: string
-  rawEstimatedHours: string
-  rawRemark: string
+export interface FetchTaskDetailParams {
   rawUrl: string
   cookie: string
-  handlerName: string
-  boundaryRules: CommentRule[]
-  boundaryMatchMode?: string
-  checkRules?: CheckRule[]
-  taskDate?: string
 }
 
 export interface CheckCommentsParams {
@@ -137,12 +132,12 @@ export interface IpcApi {
   storeDelete: (key: string) => Promise<void>
   storeKeys: () => Promise<string[]>
 
-  validateTask: (params: ValidateTaskParams) => Promise<ValidationResult>
+  fetchTaskDetail: (params: FetchTaskDetailParams) => Promise<TaskDetailResult>
 
   checkComments: (params: CheckCommentsParams) => Promise<ActivitiesResponse>
 
   // AI 通用对话（连接配置统一，传最终提示词）
-  aiChat: (params: AiChatParams) => Promise<{ text: string }>
+  aiChat: (params: AiChatParams) => Promise<{ text: string; reasoning?: string }>
 
   fetchNotifications: (params: FetchNotificationsParams) => Promise<NotificationsResponse>
   // 主进程返回 { success, data } 结构
@@ -209,6 +204,14 @@ export interface IpcApi {
   profileRename: (oldName: string, newName: string) => Promise<string[]>
   profileDelete: (name: string) => Promise<string[]>
   onProfileSwitched: (callback: (name: string) => void) => () => void
+
+  // 应用更新
+  checkUpdate: () => Promise<UpdateCheckResult>
+  getUpdateStatus: () => Promise<UpdateStatus>
+  applyUpdate: (params: UpdateApplyParams) => Promise<UpdateApplyResult>
+  onUpdateAvailable: (callback: (data: UpdateCheckResult) => void) => () => void
+  onUpdateProgress: (callback: (data: UpdateProgress) => void) => () => void
+  onUpdateFailed: (callback: (data: { error: string }) => void) => () => void
   onAutoSyncSettingsChanged: (callback: () => void) => () => void
   onBackupCompleted: (callback: () => void) => () => void
 }

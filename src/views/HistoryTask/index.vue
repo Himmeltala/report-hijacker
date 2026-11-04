@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 08:54:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-10-30 09:58:14
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\views\HistoryTask\index.vue
  * @Description: 历史任务页面
 -->
@@ -157,15 +157,15 @@
               <span v-else class="text-muted">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="校验" align="center" min-width="100">
+          <el-table-column label="AI 审查" align="center" min-width="120">
             <template #default="{ row }">
               <el-tag
-                v-if="row.serCheckResult"
-                :type="row.serCheckResult.serValid ? 'success' : 'danger'"
+                v-if="row.serAiConclusion"
+                :type="isAiReviewPassed(row.serAiConclusion) ? 'success' : 'danger'"
                 style="cursor: pointer"
                 @click="showDetail(row)"
               >
-                {{ row.serCheckResult.serValid ? '通过' : '异常' }}
+                {{ isAiReviewPassed(row.serAiConclusion) ? '通过' : '未通过' }}
               </el-tag>
               <span v-else class="text-muted">-</span>
             </template>
@@ -223,7 +223,7 @@
           </el-table-column>
           <el-table-column label="操作" align="center" min-width="310">
             <template #default="{ row }">
-              <el-button type="primary" text @click="showDetail(row)">校验详情</el-button>
+              <el-button type="primary" text @click="showDetail(row)">详情</el-button>
               <el-button type="primary" text @click="openEditDialog(row)">编辑任务</el-button>
               <el-popconfirm title="确认删除该任务?" @confirm="removeTask(row)">
                 <template #reference>
@@ -274,10 +274,9 @@ import { useDrawerResize } from '@/composables/useDrawerResize'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
-import { validateBatch, type TaskToValidate } from '@/services/taskValidation'
+import { reviewBatch, isAiReviewPassed, type TaskToValidate } from '@/services/taskValidation'
 import { computeTaskStats } from '@/services/taskStats'
 import { flushHistoryChanges } from '@/services/historyPersistence'
-import { isRulesPassed, failedRuleLabels } from '@/services/validationRules'
 import { compareTaskOrder, type TaskOrderFields } from '@/services/taskOrder'
 import { taskMatchesKeyword } from '@/services/taskSearch'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
@@ -451,17 +450,6 @@ function matchesFilters(t: any): boolean {
   if (appliedFilters.filterSyncStatus && t.serSyncStatus !== appliedFilters.filterSyncStatus) return false
   if (appliedFilters.filterStatus && t.remote?._embedded?.status?.name !== appliedFilters.filterStatus) return false
   if (appliedFilters.filterType && t.remote?._embedded?.type?.name !== appliedFilters.filterType) return false
-  // 校验筛选：pass 通过、fail 异常、uncheck 未检查
-  if (appliedFilters.filterValid) {
-    const r = t.serCheckResult
-    if (appliedFilters.filterValid === 'uncheck') {
-      if (r) return false
-    } else if (appliedFilters.filterValid === 'pass') {
-      if (!r || !r.serValid) return false
-    } else {
-      if (!r || r.serValid) return false
-    }
-  }
   if (appliedFilters.filterEval) {
     const title = t.remote?._links?.customField62?.title || ''
     if (appliedFilters.filterEval === '其他') {
@@ -515,7 +503,7 @@ const matchedTasks = computed<DisplayTask[]>(() => {
 
 const activeTasks = computed<DisplayTask[]>(() => matchedTasks.value.filter((t) => !t.serPostponed))
 
-// 同步与检查范围包含延期任务，仅统计、导出、删除排除
+// 同步与 AI 审查范围包含延期任务，仅统计、导出、删除排除
 const syncableTasks = computed<DisplayTask[]>(() => matchedTasks.value)
 
 const displayTasks = computed<DisplayTask[]>(() => matchedTasks.value)
@@ -1111,12 +1099,15 @@ async function removeTask(task: any) {
 }
 // #endregion
 
-// #region 检查
-async function doCheck(tasks: Array<{ task: HistoryTaskItem }>) {
-  const { cookie, handlerName, checkRules, boundaryRules, boundaryMatchMode, commentRules, commentMatchMode } =
-    store.config
+// #region AI 审查
+async function doAiReview(tasks: Array<{ task: HistoryTaskItem }>) {
+  const { cookie, handlerName, departmentName, aiEnabled } = store.config
   if (!cookie) {
     logStore.addLog('warning', '请先在设置中填写 Cookie')
+    return { count: 0, passed: 0, failed: 0 }
+  }
+  if (!aiEnabled) {
+    logStore.addLog('warning', 'AI 审查未启用，请先在设置中开启')
     return { count: 0, passed: 0, failed: 0 }
   }
 
@@ -1136,17 +1127,9 @@ async function doCheck(tasks: Array<{ task: HistoryTaskItem }>) {
   let failed = 0
   const total = tasks.length
 
-  await validateBatch(
+  await reviewBatch(
     ttv,
-    {
-      cookie,
-      handlerName,
-      checkRules: checkRules || [],
-      boundaryRules,
-      boundaryMatchMode,
-      commentRules: commentRules || [],
-      commentMatchMode: commentMatchMode || 'all',
-    },
+    { cookie, handlerName, departmentName, aiEnabled: true },
     {
       signal: {
         // getter 把中止信号 ref 映射为 aborted 属性
@@ -1155,31 +1138,35 @@ async function doCheck(tasks: Array<{ task: HistoryTaskItem }>) {
         },
       },
       onTaskStart: (i, total, t) => {
-        logStore.addLog('info', `[${i + 1}/${total}] 检查: ${t.rawProjectName} - ${t.rawTitle}`)
+        logStore.addLog('info', `[${i + 1}/${total}] AI 审查: ${t.rawProjectName} - ${t.rawTitle}`)
       },
       // 每条完成后立即写回任务对象并输出结果日志，结果紧随开始日志
       onTaskComplete: (o) => {
         const { task } = tasks[o.index]
         if (o.error) {
-          logStore.addLog('error', `[${o.index + 1}/${total}] 检查异常: ${o.error.message}`)
+          logStore.addLog('error', `[${o.index + 1}/${total}] 处理异常: ${o.error.message}`)
           return
         }
-        task.serCheckResult = o.result
-        if (o.result?.remote && task.serSyncStatus === 'none') {
-          task.serSyncStatus = 'synced'
+        if (o.result?.serError) {
+          logStore.addLog('error', `[${o.index + 1}/${total}] 平台数据获取失败: ${o.result.serError}`)
+        }
+        if (o.result?.remote) {
+          task.remote = o.result.remote
+          if (task.serSyncStatus === 'none') task.serSyncStatus = 'synced'
         }
         count++
-        if (o.result?.serValid) passed++
-        else failed++
-        logStore.addLog(
-          o.result?.serValid ? 'success' : 'warning',
-          `[${o.index + 1}/${total}] ${o.result?.serValid ? '通过' : '失败'}`,
-        )
-        if (o.commentMatches) {
-          task.serCommentCheckResult = o.commentMatches
-          if (!isRulesPassed(o.commentMatches, commentMatchMode || 'all')) {
-            logStore.addLog('warning', `[${o.index + 1}/${total}] 评论区未通过: ${failedRuleLabels(o.commentMatches)}`)
-          }
+        task.serAiConclusion = o.aiConclusion ?? null
+        if (o.aiConclusion) {
+          if (isAiReviewPassed(o.aiConclusion)) passed++
+          else failed++
+          if (o.aiPrompt) logStore.addLog('info', `[${o.index + 1}/${total}] AI 输入: ${o.aiPrompt}`)
+          if (o.aiReasoning) logStore.addLog('info', `[${o.index + 1}/${total}] AI 思考: ${o.aiReasoning}`)
+          logStore.addLog(
+            isAiReviewPassed(o.aiConclusion) ? 'success' : 'warning',
+            `[${o.index + 1}/${total}] AI 审查: ${o.aiConclusion}`,
+          )
+        } else if (o.aiError) {
+          logStore.addLog('warning', `[${o.index + 1}/${total}] AI 审查失败: ${o.aiError}`)
         }
       },
     },
@@ -1201,22 +1188,22 @@ function buildCheckNotifyBody(passed: number, failed: number, total: number): st
   return body
 }
 
-async function handleCheckSelected() {
+async function handleAiReviewSelected() {
   const tasks = selection.value
   if (!tasks.length) return
   checking.value = true
   abortCheck.value = false
   try {
     const items = tasks.map((t) => ({ task: t }))
-    const res = await doCheck(items)
+    const res = await doAiReview(items)
     if (res.count) {
       dirty.value = true
       await handleSaveRange(true)
       if (!abortCheck.value) {
-        logStore.addLog('success', `检查完成: ${res.count} 条`)
+        logStore.addLog('success', `AI 审查完成: ${res.count} 条`)
         await maybeShowSysNotification(
           'notification.onCheckCompleted',
-          '检查完成',
+          'AI 审查完成',
           buildCheckNotifyBody(res.passed, res.failed, items.length),
         )
       }
@@ -1226,22 +1213,22 @@ async function handleCheckSelected() {
   }
 }
 
-async function handleCheckRange() {
+async function handleAiReviewRange() {
   const tasks = syncableTasks.value
   if (!tasks.length) return
   checkingAll.value = true
   abortCheck.value = false
   try {
     const items = tasks.map((t) => ({ task: t }))
-    const res = await doCheck(items)
+    const res = await doAiReview(items)
     if (res.count) {
       dirty.value = true
       await handleSaveRange(true)
       if (!abortCheck.value) {
-        logStore.addLog('success', `检查完成: ${res.count} 条`)
+        logStore.addLog('success', `AI 审查完成: ${res.count} 条`)
         await maybeShowSysNotification(
           'notification.onCheckCompleted',
-          '检查完成',
+          'AI 审查完成',
           buildCheckNotifyBody(res.passed, res.failed, items.length),
         )
       }
@@ -1252,7 +1239,7 @@ async function handleCheckRange() {
 }
 // #endregion
 
-// #region 编辑与校验详情
+// #region 编辑与详情
 
 function rebuildRaw(task: HistoryTaskItem): string {
   const scoreBracket = task.rawScore ? `【${task.rawScore}】` : ''
@@ -1270,6 +1257,8 @@ function openEditDialog(row: DisplayTask) {
           if (t) {
             Object.assign(t, updated)
             t.rawText = rebuildRaw(t)
+            // 内容已变更，旧的 AI 结论不再可信
+            t.serAiConclusion = null
             break
           }
         }
@@ -1277,85 +1266,17 @@ function openEditDialog(row: DisplayTask) {
         rebuildAllDisplayTasks()
         computeStatsCache()
         logStore.addLog('success', '已修改')
-        // 编辑后重新校验该条任务，避免校验标签与内容脱节
-        revalidateHistoryTask(updated.serId)
       },
     },
   )
-}
-
-/**
- * 单条历史任务重新校验，保持校验结果与编辑后的内容一致
- * @param {string} taskId 任务 ID
- */
-async function revalidateHistoryTask(taskId: string) {
-  const { cookie, handlerName, checkRules, boundaryRules, boundaryMatchMode, commentRules, commentMatchMode } =
-    store.config
-  if (!cookie) return
-
-  // 从内存中取编辑后的最新任务数据
-  let task: DisplayTask | undefined
-  outer: for (const day of loadedDays.value) {
-    for (const t of day.tasks) {
-      if (t.serId === taskId) {
-        task = t as DisplayTask
-        break outer
-      }
-    }
-  }
-  if (!task || !task.rawUrl) return
-
-  const outcomes = await validateBatch(
-    [
-      {
-        rawSeq: String(task.rawSeq),
-        rawProjectName: task.rawProjectName,
-        rawTitle: task.rawTitle,
-        rawScore: task.rawScore,
-        rawEstimatedHours: task.rawEstimatedHours,
-        rawRemark: task.rawRemark,
-        rawUrl: task.rawUrl,
-        taskDate: task.serDate,
-      },
-    ],
-    {
-      cookie,
-      handlerName,
-      checkRules: checkRules || [],
-      boundaryRules,
-      boundaryMatchMode,
-      commentRules: commentRules || [],
-      commentMatchMode: commentMatchMode || 'all',
-    },
-  )
-  const o = outcomes[0]
-  if (!o) return
-  if (o.error) {
-    task.serCheckResult = {
-      serTaskId: '',
-      serValid: false,
-      rawProjectName: '',
-      rawTitle: '',
-      serChecks: [],
-      serError: o.error.message,
-    }
-  } else {
-    task.serCheckResult = o.result
-    if (o.commentMatches) task.serCommentCheckResult = o.commentMatches
-  }
-  markDirty()
-  rebuildAllDisplayTasks()
-  computeStatsCache()
 }
 
 function showDetail(row: any) {
-  if (row.serCheckResult) {
-    detailModal.open({
-      result: row.serCheckResult,
-      commentResult: row.serCommentCheckResult ?? null,
-      commentMatchMode: store.config.commentMatchMode || 'all',
-    })
-  }
+  if (!row.remote && !row.serAiConclusion) return
+  detailModal.open({
+    result: { serTaskId: row.serWorkPackageId || '', remote: row.remote ?? undefined },
+    aiConclusion: row.serAiConclusion ?? null,
+  })
 }
 // #endregion
 
@@ -1610,11 +1531,6 @@ async function runAutoSync() {
   try {
     await handleSyncAll()
 
-    const autoCheck = await ipc.getSetting('history.autoSyncAutoCheck')
-    if (autoCheck !== false) {
-      await handleCheckRange()
-    }
-
     await ipc.storeSet('lastAutoSyncTime', new Date().toISOString())
     lastSyncTime.value = new Date().toLocaleString()
     logStore.addLog('success', '自动同步完成')
@@ -1689,27 +1605,27 @@ function handleDeleteCmd(cmd: string) {
   else if (cmd === 'range') handleDeleteRange()
 }
 
-// 同步与检查共用一个下拉，有勾选时作用于选中，无勾选时作用于当前范围
+// 同步与 AI 审查共用一个下拉，有勾选时作用于选中，无勾选时作用于当前范围
 function handleSyncCheckCmd(cmd: string) {
   const byRange = selection.value.length === 0
   if (cmd === 'sync') {
     if (byRange) handleSyncAll()
     else handleSync()
-  } else if (cmd === 'check') {
-    if (byRange) handleCheckRange()
-    else handleCheckSelected()
-  } else if (cmd === 'syncCheck') {
-    handleSyncThenCheck(byRange)
+  } else if (cmd === 'aiCheck') {
+    if (byRange) handleAiReviewRange()
+    else handleAiReviewSelected()
+  } else if (cmd === 'syncAiCheck') {
+    handleSyncThenAiReview(byRange)
   }
 }
 
-// 先同步再检查，同步被停止时不再继续检查
-async function handleSyncThenCheck(byRange: boolean) {
+// 先同步再 AI 审查，同步被停止时不再继续审查
+async function handleSyncThenAiReview(byRange: boolean) {
   if (byRange) await handleSyncAll()
   else await handleSync()
   if (abortSync.value) return
-  if (byRange) await handleCheckRange()
-  else await handleCheckSelected()
+  if (byRange) await handleAiReviewRange()
+  else await handleAiReviewSelected()
 }
 
 function handleExportCmd(cmd: string) {

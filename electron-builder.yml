@@ -47,3 +47,5 @@ nsis:
   # 快捷方式名与卸载列表用中文；productName 保持英文，存储路径与安装目录跟着它
   shortcutName: 任务管理器
   uninstallDisplayName: 任务管理器
+  # 安装页显示详细信息面板并输出安装步骤日志，脚本内容见 scripts/installer.nsh
+  include: scripts/installer.nsh

@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 21:36:19
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-07-14 00:31:31
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \..\\src\\views\\ExportTask\\components\\StatusBar.vue
  * @Description: 描述
 -->
@@ -12,9 +12,9 @@
     <div class="status-left">
       <span class="status-item">任务: {{ taskCount }}</span>
       <span v-if="validCount > 0 || invalidCount > 0" class="status-item">
-        校验:
-        <span class="text-success">{{ validCount }} 通过</span>
-        <span v-if="invalidCount > 0" class="text-danger"> / {{ invalidCount }} 失败</span>
+        取数:
+        <span class="text-success">{{ validCount }} 成功</span>
+        <span v-if="invalidCount > 0" class="text-danger"> / {{ invalidCount }} 异常</span>
       </span>
     </div>
     <div class="status-right"></div>

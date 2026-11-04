@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-04
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \electron\services\settingsService.ts
  * @Description: 设置服务：schema 驱动的默认值构建、JSON 持久化及设置 IPC
  */
@@ -17,6 +17,64 @@ import { readJsonFile, listJsonBasenames } from '@electron/utils'
 /** 导出设置时 Cookie 的脱敏占位值，导入时识别该值并跳过，保留当前 Cookie */
 const COOKIE_MASK = '******'
 
+/** 历史版本的任务审查默认提示词：设置里仍是旧默认值时升级为当前默认，用户自己改过的不动 */
+const LEGACY_TASK_REVIEW_PROMPTS = [
+  `你是任务完成情况审查员。根据以下任务信息审查任务是否已按要求完成，只输出审查结论文本。
+
+任务标题：{title}
+任务状态：{status}
+任务类型：{type}
+任务描述：
+{description}
+
+评论区内容：
+{comments}
+
+要求：
+1. 只输出审查结论，不超过 30 字，不要输出其他任何内容。
+2. 发现问题时直接指出问题本身，例如：代码未提交、评论未说明完成情况、缺少成果形式。
+3. 未发现明显问题时输出：审查通过。`,
+  `你是任务完成情况审查员。审查下面这条任务是否已按要求完成，只输出审查结论。
+
+任务信息：
+任务标题：{title}
+任务状态：{status}
+任务类型：{type}
+任务日期：{date}
+今天日期：{today}
+处理人（任务）：{responsible}
+处理人（设置预期）：{expectedHandler}
+所属部门（任务）：{department}
+所属部门（设置预期）：{expectedDepartment}
+自评时长（小时）：{selfHours}
+预估时长（小时）：{estimateHours}
+
+任务描述：
+{description}
+
+评论区内容：
+{comments}
+
+审查标准：
+一、任务描述是否写清四部分
+1. 是什么：前提条件、成果形式、边界三项都要有。缺哪项就指出，并依据「干什么」给出补充建议。
+2. 干什么：要做的事是否表达清楚；模棱两可或与标题不符时指出。
+3. 怎么检查：检查内容是否齐全；按任务内容补充应该覆盖的测试用例建议。
+4. 怎么做：是否包含流程图与做法步骤；从描述里提取关键步骤，缺失时给出建议。
+二、任务属性
+5. 处理人是否与设置中的处理人一致，所属部门是否与设置中的所属部门一致；设置中的处理人或所属部门为空时跳过对应比对。
+6. 自评时长不得超过预估时长 1.5 小时，超出时报问题（自评减预估大于 1.5 小时才算异常）。
+7. 任务日期是否在今天范围内；任务日期为空时跳过此项。
+三、评论区
+8. 是否说明完成情况，是否有代码提交记录与成果物（截图、文档、链接等）提交信息，缺失时指出。
+
+输出要求：
+1. 只输出审查结论，可以分条列出，不再限制字数。
+2. 未发现明显问题时输出「审查通过」。
+3. 发现问题时逐条列出问题，并对可补充内容给出具体建议，例如补充前提条件、成果形式、边界、测试用例、做法步骤。
+4. 任务类型为缺陷时跳过「一」的描述完整性审查，只审查任务属性与评论区。`,
+]
+
 // #endregion
 
 // #region AppSettings 类
@@ -28,6 +86,7 @@ export class AppSettings {
   private path: string
   private schemaPath: string
   private data: Record<string, any> = {}
+  private schemaDefaults: Record<string, any> = {}
 
   constructor(settingsPath: string, schemaPath: string) {
     this.path = settingsPath
@@ -40,6 +99,7 @@ export class AppSettings {
 
   private buildDefaults(): void {
     this.data = {}
+    this.schemaDefaults = {}
     if (!existsSync(this.schemaPath)) return
     try {
       const schema = JSON.parse(readFileSync(this.schemaPath, 'utf-8'))
@@ -47,6 +107,7 @@ export class AppSettings {
         for (const group of cat.groups || []) {
           for (const setting of group.settings || []) {
             if (setting.default !== undefined && setting.default !== null) {
+              this.schemaDefaults[setting.key] = setting.default
               this.setNested(setting.key, setting.default)
             }
           }
@@ -89,9 +150,20 @@ export class AppSettings {
     try {
       const loaded = JSON.parse(readFileSync(this.path, 'utf-8'))
       this.deepMerge(this.data, loaded)
+      this.upgradeLegacyTaskReviewPrompt()
     } catch (e) {
       console.error('[Settings] 读取设置文件失败:', e)
     }
+  }
+
+  /** 旧版任务审查默认提示词升级：只替换仍是旧默认值的配置，用户改过的不动 */
+  private upgradeLegacyTaskReviewPrompt(): void {
+    const current = this.data?.ai?.taskReview?.prompt
+    const next = this.schemaDefaults['ai.taskReview.prompt']
+    if (typeof current !== 'string' || typeof next !== 'string') return
+    if (!LEGACY_TASK_REVIEW_PROMPTS.includes(current.trim())) return
+    this.data.ai.taskReview.prompt = next
+    this.save()
   }
 
   // #endregion
@@ -171,8 +243,10 @@ export function setupSettingsIpc(deps: {
   mainWindow: BrowserWindow | null
   getStoreDir: () => string
   onBackupSettingChanged: () => void
+  /** 更新设置变更后的回调，用于重建更新检查定时器 */
+  onUpdateSettingChanged?: () => void
 }): void {
-  const { getSettings, mainWindow, getStoreDir, onBackupSettingChanged } = deps
+  const { getSettings, mainWindow, getStoreDir, onBackupSettingChanged, onUpdateSettingChanged } = deps
 
   // #region 设置读写
 
@@ -207,6 +281,10 @@ export function setupSettingsIpc(deps: {
     // 自动同步设置变更后通知渲染进程重启定时器，无需重启或重新进页才能生效
     if (key.startsWith('history.autoSync')) {
       mainWindow?.webContents.send('event:autoSyncSettingsChanged')
+    }
+    // 更新设置变更后立即重建更新检查定时器
+    if (key.startsWith('update.')) {
+      onUpdateSettingChanged?.()
     }
   })
   ipcMain.handle('settings:getSchema', () => {

@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-13 00:26:38
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-07-15 10:02:58
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \electron\preload.ts
  * @Description: 预加载脚本，通过 contextBridge 暴露 IPC 接口
  */
@@ -25,8 +25,8 @@ contextBridge.exposeInMainWorld('electron', {
   importSettings: () => ipcRenderer.invoke('settings:import'),
   // #endregion
 
-  // #region 校验任务
-  validateTask: (params: any) => ipcRenderer.invoke('api:validateTask', params),
+  // #region 任务详情
+  fetchTaskDetail: (params: any) => ipcRenderer.invoke('api:fetchTaskDetail', params),
   checkComments: (params: any) => ipcRenderer.invoke('api:checkComments', params),
   aiChat: (params: any) => ipcRenderer.invoke('ai:chat', params),
   // #endregion
@@ -79,6 +79,15 @@ contextBridge.exposeInMainWorld('electron', {
   profileAdd: (name: string) => ipcRenderer.invoke('profile:add', name),
   profileRename: (oldName: string, newName: string) => ipcRenderer.invoke('profile:rename', oldName, newName),
   profileDelete: (name: string) => ipcRenderer.invoke('profile:delete', name),
+  // #endregion
+
+  // #region 应用更新
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:status'),
+  applyUpdate: (params: any) => ipcRenderer.invoke('update:apply', params),
+  onUpdateAvailable: (callback: (data: any) => void) => subscribe('event:updateAvailable', callback),
+  onUpdateProgress: (callback: (data: any) => void) => subscribe('event:updateProgress', callback),
+  onUpdateFailed: (callback: (data: { error: string }) => void) => subscribe('event:updateFailed', callback),
   // #endregion
 
   // #region 事件监听

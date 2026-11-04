@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-09-14 10:00:00
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-09-14 10:00:00
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: /src/views/HistoryTask/components/ToolBar.vue
  * @Description: 历史任务工具栏组件，按钮可用状态与操作结果由父组件通过状态对象与事件驱动
 -->
@@ -28,16 +28,18 @@
           <el-icon><CircleClose /></el-icon>停止同步
         </el-button>
         <el-button v-else-if="state.checking" type="danger" @click.stop="emit('abort-check')">
-          <el-icon><CircleClose /></el-icon>停止检查
+          <el-icon><CircleClose /></el-icon>停止审查
         </el-button>
         <el-button v-else :disabled="!hasSelection && !hasRange">
-          <el-icon><Connection /></el-icon>同步、检查<el-icon style="margin-left: 2px"><ArrowDown /></el-icon>
+          <el-icon><Connection /></el-icon>同步、审查<el-icon style="margin-left: 2px"><ArrowDown /></el-icon>
         </el-button>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="sync" :disabled="!hasSelection && !hasRange">同步</el-dropdown-item>
-            <el-dropdown-item command="check" :disabled="!hasSelection && !hasRange">检查</el-dropdown-item>
-            <el-dropdown-item command="syncCheck" :disabled="!hasSelection && !hasRange">同步与检查</el-dropdown-item>
+            <el-dropdown-item command="aiCheck" :disabled="!hasSelection && !hasRange">AI 审查</el-dropdown-item>
+            <el-dropdown-item command="syncAiCheck" :disabled="!hasSelection && !hasRange"
+              >同步与 AI 审查</el-dropdown-item
+            >
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -90,7 +92,7 @@ export interface ToolbarState {
   totalCount: number
   /** 同步中；同步后接检查期间也为真 */
   syncing: boolean
-  /** 检查中；同步后接检查期间也为真 */
+  /** 审查中；同步后接审查期间也为真 */
   checking: boolean
   exporting: boolean
   backingUp: boolean

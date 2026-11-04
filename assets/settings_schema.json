@@ -37,231 +37,15 @@
             "type": "text",
             "default": "",
             "compareCandidate": true,
-            "description": "任务处理人名称，用于校验和导出文件名"
-          }
-        ]
-      },
-      {
-        "label": "边界校验",
-        "settings": [
-          {
-            "key": "validation.boundaryMatchMode",
-            "label": "匹配模式",
-            "type": "combo",
-            "default": "any",
-            "options": [
-              {
-                "label": "任一匹配即通过",
-                "value": "any"
-              },
-              {
-                "label": "全部匹配才通过",
-                "value": "all"
-              }
-            ],
-            "description": "边界规则的判定模式：任一匹配（OR）或全部匹配（AND）"
+            "description": "任务处理人名称，用于 AI 审查比对和导出文件名"
           },
           {
-            "key": "validation.boundaryRules",
-            "label": "匹配规则",
-            "type": "comment_rules",
-            "default": [],
-            "description": "检查任务描述「边界」字段是否匹配指定内容。支持正则表达式。适用类型留空表示只检查「任务」。"
-          }
-        ]
-      },
-      {
-        "label": "评论区检查",
-        "settings": [
-          {
-            "key": "validation.commentMatchMode",
-            "label": "匹配模式",
-            "type": "combo",
-            "default": "all",
-            "options": [
-              {
-                "label": "任一匹配即通过",
-                "value": "any"
-              },
-              {
-                "label": "全部匹配才通过",
-                "value": "all"
-              }
-            ],
-            "description": "评论区规则的判定模式：任一匹配（OR）或全部匹配（AND）"
-          },
-          {
-            "key": "validation.commentRules",
-            "label": "匹配规则",
-            "type": "comment_rules",
-            "default": [
-              {
-                "enabled": true,
-                "label": "代码提交",
-                "pattern": "代码提交",
-                "isRegex": true
-              }
-            ],
-            "description": "检查任务评论区是否包含指定内容。添加多条规则，支持正则表达式。适用类型留空表示全部类型都检查。"
-          }
-        ]
-      },
-      {
-        "label": "校验规则",
-        "settings": [
-          {
-            "key": "validation.checkRules",
-            "label": "校验规则",
-            "type": "check_rules",
-            "default": [
-              {
-                "enabled": true,
-                "label": "任务标题",
-                "field": "subject",
-                "expected": "text",
-                "expectedKey": "rawTitle",
-                "compare": "equals"
-              },
-              {
-                "enabled": true,
-                "label": "项目名称",
-                "field": "_embedded.project.name",
-                "expected": "text",
-                "expectedKey": "rawProjectName",
-                "compare": "equals"
-              },
-              {
-                "enabled": true,
-                "label": "处理人",
-                "field": "_embedded.responsible.name",
-                "expected": "config",
-                "expectedKey": "validation.handlerName",
-                "compare": "equals"
-              },
-              {
-                "enabled": true,
-                "label": "所属部门",
-                "field": "customField106",
-                "expected": "none",
-                "compare": "regex-all",
-                "matchMode": "all",
-                "rules": []
-              },
-              {
-                "enabled": true,
-                "label": "任务状态",
-                "field": "_embedded.status.name",
-                "expected": "none",
-                "compare": "list-any",
-                "values": [
-                  "待检查",
-                  "已实现"
-                ]
-              },
-              {
-                "enabled": true,
-                "label": "自评时长",
-                "field": "estimatedTime",
-                "expected": "text",
-                "expectedKey": "rawScore",
-                "compare": "diff-hours",
-                "tolerance": 3
-              },
-              {
-                "enabled": true,
-                "label": "自评与预估偏差",
-                "field": "estimatedTime",
-                "expected": "none",
-                "compare": "field-diff",
-                "compareField": "customField105",
-                "tolerance": 3
-              },
-              {
-                "enabled": true,
-                "label": "预估时长",
-                "field": "customField105",
-                "expected": "text",
-                "expectedKey": "rawScore",
-                "compare": "equals",
-                "skipTypes": [
-                  "缺陷"
-                ]
-              },
-              {
-                "enabled": true,
-                "label": "前提条件",
-                "field": "description.raw",
-                "expected": "none",
-                "compare": "regex-any",
-                "matchMode": "any",
-                "skipTypes": [
-                  "缺陷"
-                ],
-                "rules": [
-                  {
-                    "enabled": true,
-                    "label": "前提条件",
-                    "pattern": "前提条件[：:]\\s*\\S",
-                    "isRegex": true
-                  }
-                ]
-              },
-              {
-                "enabled": true,
-                "label": "成果形式",
-                "field": "description.raw",
-                "expected": "none",
-                "compare": "regex-any",
-                "matchMode": "any",
-                "skipTypes": [
-                  "缺陷"
-                ],
-                "rules": [
-                  {
-                    "enabled": true,
-                    "label": "成果形式",
-                    "pattern": "成果形式[：:]\\s*\\S",
-                    "isRegex": true
-                  }
-                ]
-              },
-              {
-                "enabled": true,
-                "label": "自评时长下限",
-                "field": "estimatedTime",
-                "expected": "none",
-                "compare": "gte",
-                "expectedKey": "0.5"
-              },
-              {
-                "enabled": true,
-                "label": "预估时长下限",
-                "field": "customField105",
-                "expected": "none",
-                "compare": "gte",
-                "expectedKey": "0.5"
-              },
-              {
-                "enabled": true,
-                "label": "流程图",
-                "field": "description.raw",
-                "expected": "none",
-                "compare": "regex-any",
-                "matchMode": "any",
-                "skipTypes": [
-                  "缺陷"
-                ],
-                "rules": [
-                  {
-                    "enabled": true,
-                    "label": "包含图片",
-                    "pattern": "<img\\b|\\.(png|jpg|jpeg|gif|webp|bmp)\\b|/api/v3/attachments/\\d+/content",
-                    "isRegex": true
-                  }
-                ]
-              }
-            ],
-            "description": "逐字段校验：平台字段与文本任务/配置预期比对。字段、比对方式、容差、白名单、多条件（或/且）均可配置。"
+            "key": "validation.departmentName",
+            "label": "所属部门",
+            "type": "text",
+            "default": "",
+            "compareCandidate": true,
+            "description": "任务所属部门名称，用于 AI 审查比对"
           }
         ]
       }
@@ -327,8 +111,8 @@
             "key": "ai.taskReview.prompt",
             "label": "提示词模板",
             "type": "textarea",
-            "default": "你是任务完成情况审查员。根据以下任务信息审查任务是否已按要求完成，只输出审查结论文本。\n\n任务标题：{title}\n任务状态：{status}\n任务类型：{type}\n任务描述：\n{description}\n\n评论区内容：\n{comments}\n\n要求：\n1. 只输出审查结论，不超过 30 字，不要输出其他任何内容。\n2. 发现问题时直接指出问题本身，例如：代码未提交、评论未说明完成情况、缺少成果形式。\n3. 未发现明显问题时输出：审查通过。",
-            "description": "检查任务模块的 AI 审查提示词。占位符 {title} {status} {type} {description} {comments} 会自动替换为任务标题、状态、类型、描述与评论区内容，按提示词要求输出结论"
+            "default": "你是任务完成情况审查员。审查下面这条任务是否已按要求完成。\n\n任务信息：\n任务标题：{title}\n任务状态：{status}\n任务类型：{type}\n任务日期：{date}\n今天日期：{today}\n处理人（任务）：{responsible}\n处理人（设置预期）：{expectedHandler}\n所属部门（任务）：{department}\n所属部门（设置预期）：{expectedDepartment}\n自评时长（小时）：{selfHours}\n预估时长（小时）：{estimateHours}\n\n任务描述：\n{description}\n\n评论区内容：\n{comments}\n\n阅读说明：\n1. 上下文里的 [图片] 或 [图片:说明] 是平台图片占位，表示该位置已有截图、流程图或成果物，不得因为看不到图片内容而判定为缺失。\n2. 任务描述里的表格常带模板默认空行，空白行不算缺失，只按已填写的行判断。\n3. 显示为 (空) 的项表示平台上该项为空。\n\n审查标准：\n一、任务描述是否写清四部分\n1. 是什么：前提条件、成果形式、边界三项都要有。缺哪项就指出，并依据「干什么」直接给出补充文本。\n2. 干什么：要做的事是否表达清楚；模棱两可或与标题不符时指出。\n3. 怎么检查：检查内容是否齐全；按任务内容补充应该覆盖的测试用例建议。\n4. 怎么做：是否包含流程图与做法步骤；从描述里提取关键步骤，缺失时给出建议。\n二、任务属性\n5. 处理人是否与设置中的处理人一致，所属部门是否与设置中的所属部门一致；设置中的处理人或所属部门为空时跳过对应比对。\n6. 自评时长不得超过预估时长 1.5 小时，超出时报问题（自评减预估大于 1.5 小时才算异常）。\n7. 任务日期是否在今天范围内；任务日期为空时跳过此项。\n三、评论区\n8. 是否说明完成情况，是否有代码提交记录与成果物（截图、文档、链接等）提交信息，缺失时指出。\n\n输出要求：\n1. 第一行固定输出「任务标题：」加任务标题原文，不要改动标题。\n2. 未发现明显问题时，第二行只输出「审查通过」，不再输出其他内容。\n3. 发现问题时，每条问题单独成段，格式为：\n- 问题N【所属部分】：问题描述\n  建议：直接给出可以粘贴到任务里的内容，不要写「建议补充」这类空话。\n4. 「所属部分」取「是什么」「干什么」「怎么检查」「怎么做」「任务属性」「评论区」之一。\n5. 不要输出思考过程、已通过项、总结和审查标准原文。\n6. 任务类型为缺陷时跳过「一」的描述完整性审查，只审查任务属性与评论区。",
+            "description": "检查任务模块的 AI 审查提示词。占位符 {title} {status} {type} {date} {today} {responsible} {expectedHandler} {department} {expectedDepartment} {selfHours} {estimateHours} {description} {comments} 会自动替换为任务标题、状态、类型、任务日期、今天日期、任务处理人、设置中的处理人、任务所属部门、设置中的所属部门、自评时长、预估时长、任务描述与评论区内容；描述与评论区的图片会替换为 [图片] 占位，表格模板空行会被清除"
           }
         ]
       }
@@ -402,14 +186,6 @@
             "suffix": "分钟",
             "depends_on": "history.autoSyncEnabled",
             "description": "自动同步的时间间隔"
-          },
-          {
-            "key": "history.autoSyncAutoCheck",
-            "label": "同步后检查",
-            "type": "checkbox",
-            "default": true,
-            "depends_on": "history.autoSyncEnabled",
-            "description": "同步完成后自动执行检查"
           }
         ]
       },
@@ -471,11 +247,11 @@
           },
           {
             "key": "notification.onCheckCompleted",
-            "label": "检查完成通知",
+            "label": "审查完成通知",
             "type": "checkbox",
             "default": true,
             "depends_on": "notification.enabled",
-            "description": "历史任务检查完成后弹出通知"
+            "description": "AI 审查完成后系统通知"
           },
           {
             "key": "notification.onlyWhenBackground",
@@ -565,6 +341,81 @@
             "step": 100,
             "suffix": "行",
             "description": "超过此数量后自动丢弃旧日志"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "update",
+    "label": "应用更新",
+    "groups": [
+      {
+        "label": "更新设置",
+        "settings": [
+          {
+            "key": "update.enabled",
+            "label": "启用自动检查",
+            "type": "checkbox",
+            "default": true,
+            "description": "开启后按下面的间隔自动检查新版本；关闭后仍可在本页底部手动检查"
+          },
+          {
+            "key": "update.mode",
+            "label": "检查方式",
+            "type": "combo",
+            "default": "share",
+            "options": [
+              {
+                "label": "共享盘目录",
+                "value": "share"
+              },
+              {
+                "label": "更新接口",
+                "value": "http"
+              }
+            ],
+            "description": "共享盘方式从目录读取安装包并比对 MD5；接口方式调用更新接口下载安装包"
+          },
+          {
+            "key": "update.intervalHours",
+            "label": "检查间隔",
+            "type": "spinbox",
+            "default": 6,
+            "min": 1,
+            "max": 168,
+            "step": 1,
+            "suffix": "小时",
+            "depends_on": "update.enabled",
+            "depends_value": true,
+            "description": "自动检查的间隔小时数，最小 1 小时"
+          },
+          {
+            "key": "update.checkOnStartup",
+            "label": "启动时检查",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "update.enabled",
+            "depends_value": true,
+            "description": "程序启动后稍等片刻检查一次更新"
+          },
+          {
+            "key": "update.sharePath",
+            "label": "共享盘路径",
+            "type": "text",
+            "default": "",
+            "depends_on": "update.mode",
+            "depends_value": "share",
+            "description": "存放安装包的共享盘目录，如 \\\\192.168.1.10\\share\\taskmanager；程序取目录中修改时间最新的 exe，也可直接填安装包路径"
+          },
+          {
+            "key": "update.apiUrl",
+            "label": "更新接口",
+            "type": "text",
+            "default": "http://11.1.1.184/manager/check-update",
+            "depends_on": "update.mode",
+            "depends_value": "http",
+            "description": "接口返回 JSON：{version, url, md5, notes}，url 为相对路径时按接口地址补全"
           }
         ]
       }

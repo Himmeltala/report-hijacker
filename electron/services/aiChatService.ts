@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-03 22:29:35
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-03 22:29:35
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \electron\services\aiChatService.ts
  * @Description: AI 通用对话 IPC：统一连接配置调用 OpenAI 兼容大模型，供各业务模块复用
  */
@@ -64,9 +64,12 @@ export function setupAiChatIpc(deps: { getSettings: () => AppSettings }): void {
       throw new Error(`AI 接口返回 HTTP ${res.status}${body ? `: ${body.slice(0, MAX_ERROR_BODY_CHARS)}` : ''}`)
     }
     const data: any = await res.json()
-    const text = data?.choices?.[0]?.message?.content
+    const message = data?.choices?.[0]?.message
+    const text = message?.content
     if (!text || !String(text).trim()) throw new Error('AI 未返回内容')
-    return { text: String(text).trim() }
+    // 推理模型单独返回思考过程，非推理模型为空
+    const reasoning = message?.reasoning_content ? String(message.reasoning_content).trim() : ''
+    return { text: String(text).trim(), reasoning }
   })
 }
 

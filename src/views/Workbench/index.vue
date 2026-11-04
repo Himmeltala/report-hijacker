@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-16 22:56:41
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-07-19 22:56:41
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\views\Workbench\index.vue
  * @Description: 工作台
 -->
@@ -141,9 +141,8 @@ async function saveNotificationsToHistory(rows: NotificationElement[], date: str
     serWorkPackageId: null,
     remote: null,
     serSyncedAt: null,
-    // 通知没有文本预期值，不做校验，进历史后需要时再手动检查
-    serCheckResult: null,
-    serCommentCheckResult: null,
+    // 通知没有文本预期值，AI 审查在需要时手动执行
+    serAiConclusion: null,
     serPriority: null,
     serTimeLimit: null,
     serPostponed: false,

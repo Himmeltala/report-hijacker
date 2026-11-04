@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-15 09:54:03
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \electron\main.ts
  * @Description: 主进程入口：窗口、菜单、档案激活与各服务装配
  */
@@ -18,12 +18,13 @@ import {
   getProfileSettingsPath,
   setupProfileIpc,
 } from '@electron/services/profileService'
-import { setupValidationIpc } from '@electron/services/validationService'
+import { setupTaskDetailIpc } from '@electron/services/taskDetailService'
 import { setupAiChatIpc } from '@electron/services/aiChatService'
 import { setupNotificationIpc } from '@electron/services/notificationService'
 import { setupSysNotificationIpc } from '@electron/services/sysNotificationService'
 import { setupExcelIpc } from '@electron/services/excelService'
 import { setupHistoryIpc, performBackup } from '@electron/services/historyService'
+import { setupUpdateService } from '@electron/services/updateService'
 
 /** 窗口标题与任务栏用中文；存储路径由 package.json 的 productName 决定，保持英文 */
 const APP_TITLE = '任务管理器'
@@ -34,6 +35,9 @@ let schemaPathForReinit = ''
 let settings: AppSettings
 
 let backupTimer: ReturnType<typeof setInterval> | null = null
+
+/** 更新检查定时器的重建入口，设置变更与切换档案后调用 */
+let restartUpdateScheduler: () => void = () => {}
 
 // #region 数据目录
 /** 获取当前激活档案的存储目录 */
@@ -93,6 +97,7 @@ function setupMenu(): void {
       label: '系统',
       submenu: [
         { label: '设置', click: () => send('settings') },
+        { label: '检查更新', click: () => send('checkUpdate') },
         { type: 'separator' },
         // 不带快捷键，Alt+F4 由系统处理
         { label: '退出', role: 'quit' },
@@ -180,6 +185,7 @@ function activateProfile(name: string): void {
   activeProfile = name
   settings = new AppSettings(getProfileSettingsPath(name), schemaPathForReinit)
   setupBackup()
+  restartUpdateScheduler()
   mainWindow?.webContents.send('profile:switched', name)
 }
 // #endregion
@@ -188,13 +194,18 @@ function activateProfile(name: string): void {
 function setupIpcHandlers(): void {
   const api = createApiClient(() => settings.get('connection.apiBaseUrl', 'https://xmgl.cdrunnet.com'))
 
+  // 更新服务先装配：更新设置的变更回调需要拿到定时器重建入口
+  const updater = setupUpdateService({ getSettings: () => settings, getWindow: () => mainWindow })
+  restartUpdateScheduler = updater.restartScheduler
+
   setupSettingsIpc({
     getSettings: () => settings,
     mainWindow,
     getStoreDir,
     onBackupSettingChanged: setupBackup,
+    onUpdateSettingChanged: () => restartUpdateScheduler(),
   })
-  setupValidationIpc(api, { getSettings: () => settings })
+  setupTaskDetailIpc(api)
   setupAiChatIpc({ getSettings: () => settings })
   setupNotificationIpc(api)
   setupSysNotificationIpc(() => mainWindow)

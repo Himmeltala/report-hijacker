@@ -2,9 +2,9 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 00:01:53
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04 12:14:04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\views\ExportTask\index.vue
- * @Description: 描述
+ * @Description: 导出任务页面 - 解析文本、获取平台数据并导出 Excel
 -->
 
 <template>
@@ -14,8 +14,8 @@
         <el-button type="primary" @click="handleParse" :disabled="!rawText.trim()">
           <el-icon><Document /></el-icon>解析
         </el-button>
-        <el-button @click="handleValidate" :disabled="tasks.length === 0" :loading="isValidating">
-          <el-icon><Select /></el-icon>校验
+        <el-button @click="handleFetchData" :disabled="tasks.length === 0" :loading="isFetching">
+          <el-icon><Select /></el-icon>获取平台数据
         </el-button>
         <el-divider direction="vertical" />
         <el-button type="primary" @click="handleExport" :disabled="tasks.length === 0" :loading="isExporting">
@@ -62,7 +62,7 @@
 
     <TaskTable
       :tasks="tasks"
-      :validationResults="validationResults"
+      :detailResults="detailResults"
       :unrecognizedLines="unrecognizedLines"
       @remove="handleRemoveTask"
       @update="handleUpdateTask"
@@ -73,16 +73,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { storeToRefs } from 'pinia'
 import { Document, Select, Download, Delete } from '@element-plus/icons-vue'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
 import { parseTaskText } from '@/utils/parser'
-import { validateBatch, type TaskToValidate } from '@/services/taskValidation'
+import { reviewBatch, type TaskToValidate } from '@/services/taskValidation'
 import { computeTaskStats } from '@/services/taskStats'
-import { isRulesPassed, failedRuleLabels } from '@/services/validationRules'
 import type { TaskItem } from '@/types/task'
 
 import ParseInput from '@/components/ParseInput.vue'
@@ -97,7 +95,7 @@ const detailModal = useModal({
   autoCloseEvents: ['close'],
 })
 
-const isValidating = ref(false)
+const isFetching = ref(false)
 const isExporting = ref(false)
 const rawText = computed({
   get: () => taskStore.rawText,
@@ -108,23 +106,18 @@ const rawText = computed({
 
 const tasks = computed(() => taskStore.tasks)
 const unrecognizedLines = computed(() => taskStore.unrecognizedLines)
-const validationResults = computed(() => taskStore.validationResults)
+const detailResults = computed(() => taskStore.detailResults)
 
 const stats = computed(() =>
   computeTaskStats(
     tasks.value,
-    validationResults.value.map((r) => r?.remote),
+    detailResults.value.map((r) => r?.remote),
   ),
 )
 
-// 评论区检查结果存于任务 store，切换路由后保留
-const { commentCheckResults } = storeToRefs(taskStore)
-
 function showDetail(index: number) {
   detailModal.open({
-    result: taskStore.validationResults[index] ?? null,
-    commentResult: commentCheckResults.value[index] ?? null,
-    commentMatchMode: store.config.commentMatchMode || 'all',
+    result: taskStore.detailResults[index] ?? null,
   })
 }
 
@@ -137,7 +130,6 @@ function handleParse() {
   }
   const { tasks: parsed, unrecognized } = parseTaskText(rawText.value, regexStr)
   taskStore.setTasks(parsed, unrecognized)
-  commentCheckResults.value = []
 
   logStore.addLog('info', `解析完成: ${parsed.length} 条任务, ${unrecognized.length} 行未识别`)
 
@@ -150,19 +142,17 @@ function handleParse() {
   }
 }
 
-async function handleValidate() {
+async function handleFetchData() {
   if (tasks.value.length === 0) return
-  const { cookie, handlerName, checkRules, boundaryRules, boundaryMatchMode, commentRules, commentMatchMode } =
-    store.config
+  const { cookie, handlerName } = store.config
   if (!cookie) {
     logStore.addLog('warning', '请先在设置中填写 Cookie')
     return
   }
 
-  isValidating.value = true
-  taskStore.setValidationResults([])
-  commentCheckResults.value = []
-  logStore.addLog('info', `开始校验 ${tasks.value.length} 条任务...`)
+  isFetching.value = true
+  taskStore.setDetailResults([])
+  logStore.addLog('info', `开始获取平台数据 ${tasks.value.length} 条任务...`)
 
   const ttv: TaskToValidate[] = tasks.value.map((t) => ({
     rawSeq: t.rawSeq,
@@ -175,18 +165,10 @@ async function handleValidate() {
   }))
 
   try {
-    // 按原索引写入结果与日志，出错槽位保留错误结果保证与评论结果索引对齐
-    const outcomes = await validateBatch(
+    // 按原索引写入结果与日志
+    const outcomes = await reviewBatch(
       ttv,
-      {
-        cookie,
-        handlerName,
-        checkRules: checkRules || [],
-        boundaryRules,
-        boundaryMatchMode,
-        commentRules: commentRules || [],
-        commentMatchMode: commentMatchMode || 'all',
-      },
+      { cookie, handlerName },
       {
         onTaskStart: (i, total, task) => {
           logStore.addLog('info', `[${i + 1}/${total}] ${task.rawProjectName} - ${task.rawTitle}`)
@@ -194,38 +176,23 @@ async function handleValidate() {
       },
     )
 
-    let validCount = 0
+    let fetched = 0
     for (const o of outcomes) {
       if (o.error) {
-        // 出错槽位写入错误结果，表格可显示「异常」而非空白
-        taskStore.validationResults[o.index] = {
-          serTaskId: '',
-          serValid: false,
-          rawProjectName: '',
-          rawTitle: '',
-          serChecks: [],
-          serError: o.error.message,
-        }
-        logStore.addLog('error', `[${o.index + 1}] 校验异常: ${o.error.message}`)
+        logStore.addLog('error', `[${o.index + 1}] 获取失败: ${o.error.message}`)
         continue
       }
-      taskStore.validationResults[o.index] = o.result
-      if (o.result?.serValid) validCount++
-      logStore.addLog(
-        o.result?.serValid ? 'success' : 'warning',
-        `[${o.index + 1}] ${o.result?.serValid ? '通过' : '失败'}: ${ttv[o.index].rawProjectName}`,
-      )
-      if (o.commentMatches) {
-        commentCheckResults.value[o.index] = o.commentMatches
-        if (!isRulesPassed(o.commentMatches, commentMatchMode || 'all')) {
-          logStore.addLog('warning', `[${o.index + 1}] 评论区未通过: ${failedRuleLabels(o.commentMatches)}`)
-        }
+      taskStore.detailResults[o.index] = o.result
+      if (o.result?.serError) {
+        logStore.addLog('error', `[${o.index + 1}] ${o.result.serError}`)
+        continue
       }
+      fetched++
+      logStore.addLog('success', `[${o.index + 1}] 已获取: ${ttv[o.index].rawProjectName}`)
     }
-    logStore.addLog('success', `校验完成: ${validCount}/${ttv.length} 通过`)
+    logStore.addLog('success', `获取平台数据完成: ${fetched}/${ttv.length} 条`)
   } finally {
-    // 无论成功、中止还是异常，都必须恢复按钮状态避免永久 loading
-    isValidating.value = false
+    isFetching.value = false
   }
 }
 
@@ -272,17 +239,16 @@ async function handleExport() {
 }
 
 /**
- * 编辑单条任务后重新校验，保证校验状态与编辑后的内容一致
+ * 编辑单条任务后重新获取平台数据，保证展示的字段与编辑后的链接一致
  * @param {number} index 任务索引
  */
-async function revalidateTask(index: number) {
+async function fetchSingleDetail(index: number) {
   const task = tasks.value[index]
   if (!task || !task.rawUrl) return
-  const { cookie, handlerName, checkRules, boundaryRules, boundaryMatchMode, commentRules, commentMatchMode } =
-    store.config
+  const { cookie, handlerName } = store.config
   if (!cookie) return
 
-  const outcomes = await validateBatch(
+  const outcomes = await reviewBatch(
     [
       {
         rawSeq: task.rawSeq,
@@ -294,44 +260,22 @@ async function revalidateTask(index: number) {
         rawUrl: task.rawUrl,
       },
     ],
-    {
-      cookie,
-      handlerName,
-      checkRules: checkRules || [],
-      boundaryRules,
-      boundaryMatchMode,
-      commentRules: commentRules || [],
-      commentMatchMode: commentMatchMode || 'all',
-    },
+    { cookie, handlerName },
   )
   const o = outcomes[0]
   if (!o) return
-  if (o.error) {
-    taskStore.validationResults[index] = {
-      serTaskId: '',
-      serValid: false,
-      rawProjectName: '',
-      rawTitle: '',
-      serChecks: [],
-      serError: o.error.message,
-    }
-    return
-  }
-  taskStore.validationResults[index] = o.result
-  if (o.commentMatches) {
-    taskStore.commentCheckResults[index] = o.commentMatches
-  }
+  taskStore.detailResults[index] = o.error ? null : o.result
 }
 
 function handleUpdateTask(index: number, data: Partial<TaskItem>) {
   taskStore.updateTask(index, data)
   logStore.addLog('info', `更新任务 #${index + 1}`)
-  // 编辑后重新校验该条任务，避免校验标签与内容脱节
-  revalidateTask(index)
+  // 编辑后重新获取该条任务的平台数据，避免展示字段与链接脱节
+  fetchSingleDetail(index)
 }
 
 function handleRemoveTask(index: number) {
-  // 删除任务时同步移除其校验与评论检查结果，保持索引对齐
+  // 删除任务时同步移除其平台数据，保持索引对齐
   taskStore.removeTask(index)
   logStore.addLog('info', `删除任务 #${index + 1}`)
 }

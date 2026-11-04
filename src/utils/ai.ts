@@ -2,9 +2,9 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-03 22:25:54
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-03 22:25:54
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\utils\ai.ts
- * @Description: AI 模块层工具：提示词占位符替换、纯文本转换与通用 AI 通道入口
+ * @Description: AI 模块层工具：提示词占位符替换、富文本转纯文本（保留图片占位）与通用 AI 通道入口
  */
 
 import type { AiChatParams } from '@/types/ipc'
@@ -34,13 +34,23 @@ export function fillPrompt(template: string, ctx: Record<string, string>): strin
 
 /**
  * 去除 HTML 标签并还原常见实体，将富文本转为纯文本
- * @param {string} raw 原文（可能含 HTML）
+ *
+ * 图片统一保留为 [图片] 占位，避免审查时把流程图、成果物截图当成缺失项
+ * @param {string} raw 原文（可能含 HTML 或 Markdown）
  * @returns {string} 纯文本
  */
 export function toPlainText(raw: string): string {
   return raw
+    .replace(/<mention\b[^>]*data-text="([^"]*)"[^>]*>/gi, '$1')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
+    .replace(/<img\b[^>]*>/gi, (tag: string) => {
+      const alt = /\balt="([^"]*)"/i.exec(tag)?.[1]
+      return alt ? `[图片:${alt}]` : '[图片]'
+    })
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt: string) => (alt ? `[图片:${alt}]` : '[图片]'))
+    .replace(/<\/t[dh]>/gi, ' | ')
+    .replace(/<\/tr>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
@@ -48,6 +58,8 @@ export function toPlainText(raw: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&')
+    .replace(/^[\s|]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
@@ -58,12 +70,12 @@ export function toPlainText(raw: string): string {
 /**
  * 调用统一 AI 通道
  * @param {string} prompt 已组装完成的完整提示词
- * @returns {Promise<string>} 模型返回文本
+ * @returns {Promise<{ text: string; reasoning: string }>} 模型输出文本与思考过程，非推理模型思考为空
  */
-export async function aiChat(prompt: string): Promise<string> {
+export async function aiChat(prompt: string): Promise<{ text: string; reasoning: string }> {
   const params: AiChatParams = { prompt }
   const ret = await window.electron.aiChat(params)
-  return ret.text
+  return { text: ret.text, reasoning: ret.reasoning ?? '' }
 }
 
 /**

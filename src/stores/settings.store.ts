@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-12 01:19:56
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04 12:14:04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\stores\settings.store.ts
  * 应用配置 Pinia store — 管理所有持久化设置项
 
@@ -20,15 +20,11 @@ import { useLogStore } from '@/stores/log.store'
 export const SETTING_KEY_MAP: Record<keyof AppConfig, string> = {
   cookie: 'connection.cookie',
   handlerName: 'validation.handlerName',
-  boundaryRules: 'validation.boundaryRules',
-  boundaryMatchMode: 'validation.boundaryMatchMode',
+  departmentName: 'validation.departmentName',
   taskRegex: 'parsing.taskRegex',
   groupRegex: 'parsing.groupRegex',
   apiBaseUrl: 'connection.apiBaseUrl',
   templatePath: 'export.templatePath',
-  commentRules: 'validation.commentRules',
-  commentMatchMode: 'validation.commentMatchMode',
-  checkRules: 'validation.checkRules',
   aiEnabled: 'ai.enabled',
 }
 
@@ -49,154 +45,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const config = ref<AppConfig>({
     cookie: '',
     handlerName: '',
-    boundaryRules: [],
-    boundaryMatchMode: 'any',
+    departmentName: '',
     taskRegex: '',
     apiBaseUrl: '',
     templatePath: '',
     groupRegex: '',
-    // 默认值与 settings_schema.json 保持一致（首次运行由 AppSettings 写盘兜底）
-    commentRules: [{ enabled: true, label: '代码提交', pattern: '代码提交', isRegex: true }],
-    commentMatchMode: 'all',
     aiEnabled: false,
-    // 默认值与 settings_schema.json validation.checkRules 保持一致
-    checkRules: [
-      {
-        enabled: true,
-        label: '任务标题',
-        field: 'subject',
-        expected: 'text',
-        expectedKey: 'rawTitle',
-        compare: 'equals',
-      },
-      {
-        enabled: true,
-        label: '项目名称',
-        field: '_embedded.project.name',
-        expected: 'text',
-        expectedKey: 'rawProjectName',
-        compare: 'equals',
-      },
-      {
-        enabled: true,
-        label: '处理人',
-        field: '_embedded.responsible.name',
-        expected: 'config',
-        expectedKey: 'validation.handlerName',
-        compare: 'equals',
-      },
-      {
-        enabled: true,
-        label: '所属部门',
-        field: 'customField106',
-        expected: 'none',
-        compare: 'regex-all',
-        matchMode: 'all',
-        rules: [],
-      },
-      {
-        enabled: true,
-        label: '任务状态',
-        field: '_embedded.status.name',
-        expected: 'none',
-        compare: 'list-any',
-        values: ['待检查', '已实现'],
-      },
-      {
-        enabled: true,
-        label: '自评时长',
-        field: 'estimatedTime',
-        expected: 'text',
-        expectedKey: 'rawScore',
-        compare: 'diff-hours',
-        tolerance: 3,
-      },
-      {
-        enabled: true,
-        label: '自评与预估偏差',
-        field: 'estimatedTime',
-        expected: 'none',
-        compare: 'field-diff',
-        compareField: 'customField105',
-        tolerance: 3,
-      },
-      {
-        enabled: true,
-        label: '预估时长',
-        field: 'customField105',
-        expected: 'text',
-        expectedKey: 'rawScore',
-        compare: 'equals',
-        skipTypes: ['缺陷'],
-      },
-      {
-        enabled: true,
-        label: '前提条件',
-        field: 'description.raw',
-        expected: 'none',
-        compare: 'regex-any',
-        matchMode: 'any',
-        skipTypes: ['缺陷'],
-        rules: [
-          {
-            enabled: true,
-            label: '前提条件',
-            pattern: '前提条件[：:]\\s*\\S',
-            isRegex: true,
-          },
-        ],
-      },
-      {
-        enabled: true,
-        label: '成果形式',
-        field: 'description.raw',
-        expected: 'none',
-        compare: 'regex-any',
-        matchMode: 'any',
-        skipTypes: ['缺陷'],
-        rules: [
-          {
-            enabled: true,
-            label: '成果形式',
-            pattern: '成果形式[：:]\\s*\\S',
-            isRegex: true,
-          },
-        ],
-      },
-      {
-        enabled: true,
-        label: '自评时长下限',
-        field: 'estimatedTime',
-        expected: 'none' as const,
-        compare: 'gte' as const,
-        expectedKey: '0.5',
-      },
-      {
-        enabled: true,
-        label: '预估时长下限',
-        field: 'customField105',
-        expected: 'none' as const,
-        compare: 'gte' as const,
-        expectedKey: '0.5',
-      },
-      {
-        enabled: true,
-        label: '流程图',
-        field: 'description.raw',
-        expected: 'none',
-        compare: 'regex-any',
-        matchMode: 'any',
-        skipTypes: ['缺陷'],
-        rules: [
-          {
-            enabled: true,
-            label: '包含图片',
-            pattern: '<img\\b|\\.(png|jpg|jpeg|gif|webp|bmp)\\b|/api/v3/attachments/\\d+/content',
-            isRegex: true,
-          },
-        ],
-      },
-    ],
   })
 
   // #endregion

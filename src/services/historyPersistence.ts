@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-04 01:41:36
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04 12:14:04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\services\historyPersistence.ts
  * @Description: 历史数据持久化服务：按日期归组、磁盘合并去重、孤儿文件清理
  */
@@ -47,8 +47,6 @@ function taskSnapshot(task: any): string {
   delete copy.serCreatedAt
   delete copy.serUpdatedAt
   delete copy.remote
-  delete copy.serCheckResult
-  delete copy.serCommentCheckResult
   return JSON.stringify(copy)
 }
 

@@ -88,6 +88,7 @@ import { EditPen, Connection, UserFilled, Clock, Bell, ArrowDown, Check, Setting
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
+import { useUpdater } from '@/composables/useUpdater'
 import GlobalLogPanel from '@/components/GlobalLogPanel.vue'
 
 const store = useSettingsStore()
@@ -102,6 +103,8 @@ const routeKey = ref(0)
 
 const currentProfile = ref('')
 const profileList = ref<string[]>([])
+
+const updater = useUpdater()
 
 const settingsModal = useModal({ component: () => import('@/modals/SettingsModal.vue') })
 const profileModal = useModal({ component: () => import('@/modals/ProfileModal.vue') })
@@ -184,6 +187,17 @@ const cleanupTheme = window.electron?.onThemeChanged?.((newTheme: string) => {
 const cleanupMenu = window.electron?.onMenuEvent?.(({ action }) => {
   if (action === 'settings') settingsModal.open()
   if (action === 'migrate') migrationModal.open()
+  if (action === 'checkUpdate') {
+    updater.runCheck(true).then((result) => {
+      if (result?.hasUpdate) updater.offerUpdate(result)
+    })
+  }
+})
+
+// 自动检查发现新版本时由主进程推送，这里负责弹窗确认
+const cleanupUpdate = window.electron?.onUpdateAvailable?.((data) => {
+  logStore.addLog('info', `发现新版本 ${data.version || ''}，等待更新确认`)
+  updater.offerUpdate(data)
 })
 
 const cleanupProfile = window.electron?.onProfileSwitched?.((name: string) => {
@@ -248,6 +262,7 @@ onBeforeUnmount(() => {
   cleanupTheme?.()
   cleanupMenu?.()
   cleanupProfile?.()
+  cleanupUpdate?.()
 })
 </script>
 

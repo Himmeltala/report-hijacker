@@ -2,15 +2,14 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-04 23:59:29
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04 12:14:04
+ * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: \src\services\taskValidation.ts
- * @Description: 任务校验服务层，封装批量校验与评论区检查的编排逻辑
+ * @Description: 任务取数与 AI 审查编排服务
  */
 
-import type { ValidationResult, CommentRuleMatch } from '@/types/task'
-import type { CheckRule, CommentRule, MatchMode } from '@/types/config'
-import { validateTask, checkComments } from '@/utils/validator'
-import { matchTextRules } from '@/services/validationRules'
+import type { TaskDetailResult } from '@/types/task'
+import { fetchTaskDetail, checkComments } from '@/utils/taskDetail'
+import { convertIso8601ToHours } from '@/utils/parser'
 import { aiChat, fillPrompt, getAiSetting, toPlainText, MAX_CONTEXT_CHARS } from '@/utils/ai'
 
 // #region 类型定义
@@ -29,27 +28,26 @@ export interface TaskToValidate {
 export interface ValidateConfig {
   cookie: string
   handlerName: string
-  checkRules: CheckRule[]
-  boundaryRules: CommentRule[]
-  boundaryMatchMode: MatchMode
-  commentRules: CommentRule[]
-  commentMatchMode: MatchMode
-  /** 启用 AI 审查（可选，未传时不执行，保持既有流程不变） */
+  /** 设置中的所属部门，AI 审查比对用 */
+  departmentName?: string
+  /** 是否执行 AI 审查（只拉取平台数据时省略） */
   aiEnabled?: boolean
 }
 
-export interface TaskValidateOutcome {
+export interface TaskReviewOutcome {
   /** 原数组索引，批量中止时后续索引缺失 */
   index: number
-  /** 基础校验结果，校验异常时为 null */
-  result: ValidationResult | null
-  /** 评论区匹配结果，未启用规则或无任务 ID 时为 null */
-  commentMatches: CommentRuleMatch[] | null
-  /** AI 审查结论，未启用 AI 审查或无任务 ID 时为 null */
+  /** 平台任务详情，取数异常时为 null */
+  result: TaskDetailResult | null
+  /** AI 审查结论，未启用 AI 审查时为 null */
   aiConclusion: string | null
+  /** AI 审查实际发送的提示词，未执行时为 undefined */
+  aiPrompt?: string
+  /** 推理模型的思考过程，非推理模型为空 */
+  aiReasoning?: string
   /** AI 审查异常信息 */
   aiError?: string
-  /** 校验异常信息 */
+  /** 取数异常信息 */
   error?: Error
 }
 
@@ -59,7 +57,7 @@ export interface ValidateBatchOptions {
   /** 每条任务开始时回调，用于输出进度日志 */
   onTaskStart?: (index: number, total: number, task: TaskToValidate) => void
   /** 每条任务完成时立即回调，用于逐条输出结果日志 */
-  onTaskComplete?: (outcome: TaskValidateOutcome) => void
+  onTaskComplete?: (outcome: TaskReviewOutcome) => void
 }
 
 // #endregion
@@ -80,13 +78,30 @@ function extractCommentText(activities: any): string {
 // 任务审查模块提示词设置键（提示词按模块独立配置，连接配置统一全局）
 const TASK_REVIEW_PROMPT_KEY = 'ai.taskReview.prompt'
 
+/** 今天日期，YYYY-MM-DD */
+function todayText(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 时长字段转小时文本，空值返回空字符串 */
+function hoursText(raw: any): string {
+  if (raw === undefined || raw === null || raw === '') return ''
+  return String(convertIso8601ToHours(String(raw)))
+}
+
 /**
  * 对单条任务执行 AI 审查：读取模块提示词模板，任务上下文替换占位符后调用 AI 通道
- * @param {ValidationResult} result 校验结果（remote 含平台原始数据）
+ * @param {TaskDetailResult} result 任务详情（remote 含平台原始数据）
  * @param {string | null} commentText 评论区文本，null 表示取数异常
- * @returns {Promise<string>} 审查结论
+ * @param {{ handlerName?: string; departmentName?: string; taskDate?: string }} expected 设置中的预期处理人、所属部门与任务日期
+ * @returns {Promise<{ conclusion: string; prompt: string; reasoning: string }>} 审查结论、发送的提示词与思考过程
  */
-async function runAiReview(result: ValidationResult, commentText: string | null): Promise<string> {
+async function runAiReview(
+  result: TaskDetailResult,
+  commentText: string | null,
+  expected: { handlerName?: string; departmentName?: string; taskDate?: string },
+): Promise<{ conclusion: string; prompt: string; reasoning: string }> {
   const template = await getAiSetting(TASK_REVIEW_PROMPT_KEY)
   if (!template.trim()) throw new Error('未配置审查提示词')
   const remote = result.remote
@@ -95,104 +110,103 @@ async function runAiReview(result: ValidationResult, commentText: string | null)
     title: remote?.subject || '',
     status: embedded.status?.name || remote?._links?.status?.title || '',
     type: embedded.type?.name || remote?._links?.type?.title || '',
+    date: expected.taskDate || '',
+    today: todayText(),
+    responsible: embedded.responsible?.name || remote?._links?.responsible?.title || '',
+    expectedHandler: expected.handlerName || '',
+    // 所属部门平台只在 _links 里返回标题，顶层 customField106 为空
+    department: remote?._links?.customField106?.title || '',
+    expectedDepartment: expected.departmentName || '',
+    selfHours: hoursText(remote?.estimatedTime),
+    estimateHours: remote?.customField105 == null ? '' : String(remote.customField105),
     description: toPlainText(remote?.description?.raw || '').slice(0, MAX_CONTEXT_CHARS),
-    comments: (commentText || '').slice(0, MAX_CONTEXT_CHARS),
+    comments: toPlainText(commentText || '').slice(0, MAX_CONTEXT_CHARS),
   }
-  return aiChat(fillPrompt(template, ctx))
+  const prompt = fillPrompt(template, ctx)
+  const { text, reasoning } = await aiChat(prompt)
+  return { conclusion: text, prompt, reasoning }
 }
 
 // #endregion
 
-// #region 批量校验
+// #region 批量处理
 
 /**
- * 批量校验任务，按序逐条执行，支持中止信号与进度回调
- * @param {TaskToValidate[]} tasks 待校验任务列表
- * @param {ValidateConfig} config 校验配置
- * @param {ValidateBatchOptions} options 选项（中止信号、进度回调）
- * @returns {Promise<TaskValidateOutcome[]>} 与 tasks 等长的校验结果列表
+ * 判断 AI 审查结论是否为通过
+ *
+ * 结论首行是任务标题，因此按最后一行是否只有「审查通过」判断
+ * @param {string | null | undefined} conclusion 审查结论
+ * @returns {boolean} 结论为「审查通过」时返回 true
  */
-export async function validateBatch(
+export function isAiReviewPassed(conclusion?: string | null): boolean {
+  if (!conclusion) return false
+  const lines = conclusion
+    .split('\n')
+    .map((line) => line.replace(/[\s。．.!！*_`#>]/g, ''))
+    .filter(Boolean)
+  return lines[lines.length - 1] === '审查通过'
+}
+
+/**
+ * 批量处理任务：逐条拉取平台详情，启用 AI 审查时再生成审查结论
+ * @param {TaskToValidate[]} tasks 待处理任务列表
+ * @param {ValidateConfig} config 取数与审查配置
+ * @param {ValidateBatchOptions} options 选项（中止信号、进度回调）
+ * @returns {Promise<TaskReviewOutcome[]>} 与 tasks 等长的处理结果列表
+ */
+export async function reviewBatch(
   tasks: TaskToValidate[],
   config: ValidateConfig,
   options: ValidateBatchOptions = {},
-): Promise<TaskValidateOutcome[]> {
+): Promise<TaskReviewOutcome[]> {
   const { signal, onTaskStart, onTaskComplete } = options
   const total = tasks.length
+  const outcomes: TaskReviewOutcome[] = []
 
-  // 评论区规则过滤与边界规则深拷贝只需一次
-  const activeCommentRules = config.commentRules.filter((r) => r.enabled && r.pattern)
-  const commentMatchMode = config.commentMatchMode
-  const boundaryRules = JSON.parse(JSON.stringify(config.boundaryRules))
-
-  const outcomes: TaskValidateOutcome[] = []
   for (let i = 0; i < total; i++) {
     if (signal?.aborted) break
-
     const task = tasks[i]
     onTaskStart?.(i, total, task)
 
-    try {
-      const result = await validateTask(
-        task.rawSeq,
-        task.rawProjectName,
-        task.rawTitle,
-        task.rawScore,
-        task.rawEstimatedHours,
-        task.rawRemark,
-        task.rawUrl,
-        config.cookie,
-        config.handlerName,
-        config.checkRules || [],
-        boundaryRules,
-        config.boundaryMatchMode,
-        task.taskDate,
-      )
+    let result: TaskDetailResult | null = null
+    let aiConclusion: string | null = null
+    let aiPrompt: string | undefined
+    let aiReasoning: string | undefined
+    let aiError: string | undefined
+    let error: Error | undefined
 
-      // 有规则检查或 AI 审查需求时才取评论区文本，只取一次
-      let commentMatches: CommentRuleMatch[] | null = null
-      // 只对规则选中的任务类型执行，未选类型表示对全部类型生效
-      const taskType = result.remote?._embedded?.type?.name || ''
-      const applicableRules = activeCommentRules.filter((r) => !r.types?.length || r.types.includes(taskType))
-      // null 表示取数异常，跳过评论区检查
-      let commentText: string | null = null
-      if ((applicableRules.length > 0 || config.aiEnabled) && result.serTaskId) {
+    try {
+      result = await fetchTaskDetail(task.rawUrl, config.cookie)
+
+      // AI 审查：取到平台详情后执行，异常只记录不中断批量流程
+      if (config.aiEnabled && result.serTaskId && result.remote) {
+        let commentText: string | null = null
         try {
           const activities = await checkComments(result.serTaskId, config.cookie)
           commentText = extractCommentText(activities)
         } catch {
           commentText = null
         }
-      }
-      if (commentText !== null && applicableRules.length > 0) {
-        commentMatches = matchTextRules(commentText, applicableRules, commentMatchMode)
-      }
-
-      // AI 审查：仅启用时执行，异常只记录不中断校验主流程
-      let aiConclusion: string | null = null
-      let aiError: string | undefined
-      if (config.aiEnabled && result.serTaskId) {
         try {
-          aiConclusion = await runAiReview(result, commentText)
+          const review = await runAiReview(result, commentText, {
+            handlerName: config.handlerName,
+            departmentName: config.departmentName,
+            taskDate: task.taskDate,
+          })
+          aiConclusion = review.conclusion
+          aiPrompt = review.prompt
+          aiReasoning = review.reasoning
         } catch (e: any) {
           aiError = e?.message || 'AI 审查失败'
         }
       }
-
-      const outcome: TaskValidateOutcome = { index: i, result, commentMatches, aiConclusion, aiError }
-      outcomes.push(outcome)
-      onTaskComplete?.(outcome)
     } catch (e: any) {
-      const outcome: TaskValidateOutcome = {
-        index: i,
-        result: null,
-        commentMatches: null,
-        aiConclusion: null,
-        error: e,
-      }
-      outcomes.push(outcome)
-      onTaskComplete?.(outcome)
+      error = e
     }
+
+    const outcome: TaskReviewOutcome = { index: i, result, aiConclusion, aiPrompt, aiReasoning, aiError, error }
+    outcomes.push(outcome)
+    onTaskComplete?.(outcome)
   }
 
   return outcomes
