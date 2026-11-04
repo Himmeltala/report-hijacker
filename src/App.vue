@@ -100,7 +100,6 @@ const themeClass = computed(() => `theme-${theme.value}`)
 const currentRoute = computed(() => route.path)
 const routeKey = ref(0)
 
-// 用户档案
 const currentProfile = ref('')
 const profileList = ref<string[]>([])
 
@@ -119,7 +118,7 @@ async function loadProfiles() {
 
 async function onProfileDropdownVisible(visible: boolean) {
   if (visible) {
-    // 复用 loadProfiles，下拉刷新静默失败
+    // 下拉刷新静默失败
     try {
       await loadProfiles()
     } catch {
@@ -139,7 +138,7 @@ async function handleProfileCommand(cmd: { action: string; name?: string }) {
 async function switchProfile(name: string) {
   try {
     await window.electron.profileSwitch(name)
-    // 切换后主进程会发送 profile:switched 事件，在事件中统一处理
+    // 切换后主进程发送 profile:switched 事件，界面更新统一在事件中处理
   } catch (e) {
     logStore.addLog('error', `切换用户失败: ${(e as Error).message || e}`)
   }
@@ -148,7 +147,7 @@ async function switchProfile(name: string) {
 async function handleProfileSwitched(_name: string) {
   // 先完成新档案配置加载，再重挂载页面，避免页面用旧档案配置发起请求
   await store.loadConfig()
-  // 应用新档案的主题设置（L23）
+  // 应用新档案的主题设置
   try {
     const savedTheme = await window.electron.getSetting('appearance.theme')
     theme.value = savedTheme || 'dark'
@@ -193,13 +192,11 @@ const cleanupProfile = window.electron?.onProfileSwitched?.((name: string) => {
 })
 
 onMounted(async () => {
-  // store.loadConfig() 已在 main.ts pre-mount 阶段调用，此处不重复加载
+  // 配置已在启动阶段加载，此处不重复
   logStore.loadSettings()
 
-  // 加载用户档案
   await loadProfiles()
 
-  // 从设置读取主题，默认 dark
   try {
     const savedTheme = await window.electron.getSetting('appearance.theme')
     theme.value = savedTheme || 'dark'

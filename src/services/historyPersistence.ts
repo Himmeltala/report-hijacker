@@ -12,9 +12,7 @@ import { ipc } from '@/utils/ipc'
 
 // #region 辅助函数
 
-/**
- * 安全的深层克隆，处理循环引用
- * OpenProject API 返回的 remote 对象 _links 包含自引用，JSON.stringify 会抛异常
+/** 深层克隆，处理循环引用（OpenProject remote 的 _links 自引用会使 JSON.stringify 抛异常）
  * @param {any} obj 需要克隆的对象
  * @returns {any} 克隆后的对象
  */
@@ -31,12 +29,6 @@ function safeClone(obj: any): any {
   )
 }
 
-/**
- * 判断两个任务 ID 集合是否一致
- * @param {Set<string>} a 任务 ID 集合
- * @param {Set<string>} b 任务 ID 集合
- * @returns {boolean} 是否一致
- */
 function sameIdSet(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false
   for (const id of a) {
@@ -45,9 +37,7 @@ function sameIdSet(a: Set<string>, b: Set<string>): boolean {
   return true
 }
 
-/**
- * 生成任务内容的比较快照，剔除日期、时间戳、remote 等不会触发业务变更的字段
- * remote 来自平台 API，只读不修改，且含 _links 循环引用无法 JSON.stringify
+/** 生成任务比较快照，剔除日期、时间戳等不触发业务变更的字段；remote 含 _links 循环引用，无法 JSON.stringify
  * @param {any} task 任务对象
  * @returns {string} 任务内容的 JSON 序列化结果
  */
@@ -62,8 +52,7 @@ function taskSnapshot(task: any): string {
   return JSON.stringify(copy)
 }
 
-/**
- * 比较两组任务内容是否一致（按任务 ID 配对比较）
+/** 比较两组任务内容是否一致，按任务 ID 配对
  * @param {any[]} a 任务列表
  * @param {any[]} b 任务列表
  * @returns {boolean} 内容是否一致
@@ -83,9 +72,7 @@ function sameTasksContent(a: any[], b: any[]): boolean {
 
 // #region 追加保存
 
-/**
- * 把任务追加进指定日期的历史文件，按 rawUrl 判重，序号续接已有最大值
- * 提取页与工作台共用，保证两处的判重规则一致
+/** 把任务追加进指定日期的历史文件，按 rawUrl 判重，序号续接已有最大值
  * @param {string} date 保存日期（YYYY-MM-DD）
  * @param {HistoryTaskItem[]} tasks 待保存任务
  * @returns {Promise<number>} 实际新增的条数
@@ -123,10 +110,7 @@ export async function mergeTasksIntoHistory(date: string, tasks: HistoryTaskItem
 
 // #region 持久化主函数
 
-/**
- * 将内存中的日期数据持久化到磁盘
- * 处理流程：按 _date 重新归组、与磁盘已有数据按任务 ID 去重合并
- * （并行读取）、内容无变化时跳过写入、并行保存/删除、清理孤儿文件
+/** 将内存中的日期数据持久化到磁盘：按 _date 重新归组、按任务 ID 去重合并、内容无变化时跳过写入、清理孤儿文件
  * @param {HistoryDay[]} loadedDays 内存中的日期数据列表
  * @returns {Promise<HistoryDay[]>} 归组后的新日期数据列表
  */
@@ -152,7 +136,6 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
     }
   }
 
-  // 并行读取范围内的磁盘数据
   const allDates = new Set([...map.keys(), ...originalDates])
   const diskData = await Promise.all(
     Array.from(allDates).map(async (date) => ({ date, day: await ipc.getHistoryDate(date) })),
@@ -171,7 +154,6 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
 
   // #region 合并与去重
 
-  // 合并磁盘已有数据（按任务 ID 去重），内容无变化时跳过写入
   const saveBatch: Array<{ date: string; data: HistoryDay }> = []
   const deleteDates: string[] = []
 
@@ -186,7 +168,7 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
           mergedIds.add(t.serId)
         }
       }
-      // 任务 ID 与内容均无变化时跳过写入；内容有差异（编辑、延期、检查、同步回写）必须落盘
+      // 任务 ID 与内容均无变化时跳过写入，内容有差异必须落盘
       if (sameIdSet(existingIds, mergedIds) && sameTasksContent(day.tasks, existing.tasks)) {
         continue
       }
@@ -213,7 +195,6 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
 
   // #region 持久化操作
 
-  // 并行保存与删除
   if (saveBatch.length > 0) {
     await ipc.batchSaveHistory(saveBatch)
   }

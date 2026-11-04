@@ -26,7 +26,7 @@ export interface HistoryTaskItem {
   rawText: string
   serSyncStatus: 'none' | 'synced'
   serWorkPackageId: string | null
-  /** 远程原始数据（只读，禁止修改，平台字段原封不动） */
+  /** 远程原始数据，只读，平台字段原封不动 */
   remote: ReadonlyRawWorkPackage | null
   serSyncedAt: string | null
   serCheckResult: ValidationResult | null
@@ -37,7 +37,6 @@ export interface HistoryTaskItem {
   serTimeLimit: 'today' | 'temp' | null
   /** 是否为延期任务（本地标记） */
   serPostponed: boolean
-  /** 延期原因 */
   serPostponedReason: string
   serCreatedAt: string
   serUpdatedAt: string
@@ -71,9 +70,9 @@ export interface CheckCommentsParams {
   cookie: string
 }
 
-export interface AiReviewParams {
-  taskId: string
-  cookie: string
+export interface AiChatParams {
+  /** 占位符替换后的最终提示词 */
+  prompt: string
 }
 
 export interface OpenFileParams {
@@ -124,7 +123,6 @@ export interface FillExcelTemplateResult {
 }
 
 export interface IpcApi {
-  // 设置
   getSetting: (key: string) => Promise<any>
   getSettingsAll: () => Promise<Record<string, any>>
   setSetting: (key: string, value: any) => Promise<void>
@@ -134,28 +132,23 @@ export interface IpcApi {
   onThemeChanged: (callback: (theme: string) => void) => () => void
   onMenuEvent: (callback: (data: { action: string }) => void) => () => void
 
-  // 通用数据存储
   storeGet: (key: string) => Promise<any>
   storeSet: (key: string, value: any) => Promise<void>
   storeDelete: (key: string) => Promise<void>
   storeKeys: () => Promise<string[]>
 
-  // 校验任务
   validateTask: (params: ValidateTaskParams) => Promise<ValidationResult>
 
-  // 评论区检查
   checkComments: (params: CheckCommentsParams) => Promise<ActivitiesResponse>
 
-  // AI 审查
-  aiReview: (params: AiReviewParams) => Promise<{ conclusion: string }>
+  // AI 通用对话（连接配置统一，传最终提示词）
+  aiChat: (params: AiChatParams) => Promise<{ text: string }>
 
-  // 通知
   fetchNotifications: (params: FetchNotificationsParams) => Promise<NotificationsResponse>
-  // 主进程实际返回 { success, data } 结构，类型与实现保持一致
+  // 主进程返回 { success, data } 结构
   markNotificationRead: (params: MarkNotificationReadParams) => Promise<{ success: boolean; data?: any }>
   markNotificationsRead: (params: MarkNotificationsReadParams) => Promise<{ success: boolean; data?: any }>
 
-  // 系统通知
   showSysNotification: (params: {
     title: string
     body: string
@@ -163,15 +156,12 @@ export interface IpcApi {
     timeoutType?: 'default' | 'never'
   }) => Promise<{ success: boolean; reason?: string }>
 
-  // 文件对话框
   openFile: (params: OpenFileParams) => Promise<string | null>
   saveFile: (params: SaveFileParams) => Promise<string | null>
 
-  // 文件读写
   writeTextFile: (params: WriteTextFileParams) => Promise<void>
   fillExcelTemplate: (params: FillExcelTemplateParams) => Promise<FillExcelTemplateResult>
 
-  // 历史任务
   listHistoryDates: (range?: { startDate?: string; endDate?: string }) => Promise<string[]>
   getHistoryDate: (date: string) => Promise<HistoryDay | null>
   saveHistoryDate: (date: string, data: any) => Promise<void>
@@ -204,7 +194,7 @@ export interface IpcApi {
   migrateHistoryLayout: () => Promise<{
     /** 扫描到的待迁移文件数 */
     total: number
-    /** 成功搬进年/月目录的文件数 */
+    /** 成功搬进年月层级目录的文件数 */
     moved: number
     /** 目标位置已有同名文件而跳过的数量 */
     skipped: number
@@ -212,7 +202,6 @@ export interface IpcApi {
     failed: number
   }>
 
-  // 用户档案管理
   profileCurrent: () => Promise<string>
   profileList: () => Promise<string[]>
   profileSwitch: (name: string) => Promise<void>

@@ -8,7 +8,6 @@
 -->
 <template>
   <div class="page-history">
-    <!-- 工具栏 -->
     <ToolBar
       :state="toolbarState"
       @save="handleSaveRange()"
@@ -21,7 +20,6 @@
       @abort-check="handleAbortCheck"
     />
 
-    <!-- 筛选栏 -->
     <FilterBar
       v-model="filters"
       :tasks="allDisplayTasks"
@@ -30,7 +28,6 @@
       @restored="onFilterRestored"
     />
 
-    <!-- 统计栏 -->
     <div v-if="stats.totalTasks" class="stats-bar">
       <span class="stat-item"
         >任务数 <strong>{{ stats.totalTasks }}</strong></span
@@ -66,7 +63,6 @@
       </el-button>
     </div>
 
-    <!-- 任务表格 -->
     <div class="table-area">
       <el-scrollbar>
         <el-table
@@ -250,7 +246,6 @@
       </div>
     </div>
 
-    <!-- 统计详情抽屉 -->
     <el-drawer v-model="showStatsDrawer" size="480px" direction="rtl">
       <template #header>
         <span>统计详情</span>
@@ -260,7 +255,6 @@
       <CompareWithLastDrawer v-if="showStatsDrawer" :chart-data="chartData" :detail-rows="detailRows" />
     </el-drawer>
 
-    <!-- 数据统计抽屉 -->
     <el-drawer v-model="showHeatmapDrawer" size="640px" direction="rtl">
       <template #header>
         <span>数据统计</span>
@@ -312,9 +306,9 @@ const logStore = useLogStore()
 // #endregion
 
 // #region 响应式状态
-// 筛选栏条件，与 FilterBar 组件通过 v-model 双向绑定，属于编辑中状态，点击搜索后才生效
+// 筛选栏编辑中的条件，点击搜索后才生效
 const filters = reactive<FilterState>(createDefaultFilterState())
-// 已生效的筛选条件快照，列表过滤与数据查询都以该快照为准，条件变更不再立即触发搜索
+// 已生效的筛选条件快照，列表与查询以此为准，条件变更不立即触发搜索
 const appliedFilters = reactive<FilterState>(createDefaultFilterState())
 const loadedDays = shallowRef<HistoryDay[]>([])
 const prevDays = shallowRef<HistoryDay[]>([])
@@ -331,7 +325,7 @@ const showHeatmapDrawer = ref(false)
 const statsResizeHandle = ref<HTMLElement | null>(null)
 const heatmapResizeHandle = ref<HTMLElement | null>(null)
 
-// #region 抽屉拖拽调整宽度，宽度持久化到本地存储，下次打开自动恢复
+// #region 抽屉拖拽调宽，宽度持久化到本地存储
 const { handleResizeMousedown: statsResizeMousedown } = useDrawerResize(
   showStatsDrawer,
   { storageKey: 'historyStatsDrawerWidth' },
@@ -401,7 +395,7 @@ interface DisplayTask extends HistoryTaskItem {
 // #region 计算属性
 const allDisplayTasks = shallowRef<DisplayTask[]>([])
 
-// 重新计算 allDisplayTasks：按平台状态、平台类型排序，与主进程同一套比较器
+// 重新计算 allDisplayTasks：按平台状态、平台类型排序
 function rebuildAllDisplayTasks() {
   const tasks: DisplayTask[] = []
   for (const day of loadedDays.value) {
@@ -428,7 +422,7 @@ function toOrderFields(t: DisplayTask): TaskOrderFields {
 }
 
 /**
- * 判断任务是否匹配当前生效的搜索关键字
+ * 判断任务是否匹配生效的搜索关键字
  * @param {any} t 任务对象
  * @returns {boolean} 无关键字或匹配时为 true
  */
@@ -437,12 +431,12 @@ function matchesKeyword(t: any): boolean {
 }
 
 /**
- * 判断任务是否匹配当前生效的列筛选条件
+ * 判断任务是否匹配生效的列筛选条件
  * @param {any} t 任务对象
  * @returns {boolean} 全部筛选通过时为 true
  */
 function matchesFilters(t: any): boolean {
-  // 执行优先级：无筛选 "" 或匹配值，"none" 表示未设置（null）
+  // 执行优先级筛选值 "none" 表示未设置
   if (appliedFilters.filterPriority) {
     if (appliedFilters.filterPriority === 'none') {
       if (t.serPriority) return false
@@ -450,18 +444,14 @@ function matchesFilters(t: any): boolean {
       if (t.serPriority !== appliedFilters.filterPriority) return false
     }
   }
-  // 执行延期
   if (appliedFilters.filterPostponed) {
     const want = appliedFilters.filterPostponed === 'true'
     if (!!t.serPostponed !== want) return false
   }
-  // 同步状态
   if (appliedFilters.filterSyncStatus && t.serSyncStatus !== appliedFilters.filterSyncStatus) return false
-  // 平台状态
   if (appliedFilters.filterStatus && t.remote?._embedded?.status?.name !== appliedFilters.filterStatus) return false
-  // 平台类型
   if (appliedFilters.filterType && t.remote?._embedded?.type?.name !== appliedFilters.filterType) return false
-  // 校验筛选项，通过对应 pass，异常对应 fail，未检查对应 uncheck
+  // 校验筛选：pass 通过、fail 异常、uncheck 未检查
   if (appliedFilters.filterValid) {
     const r = t.serCheckResult
     if (appliedFilters.filterValid === 'uncheck') {
@@ -472,7 +462,6 @@ function matchesFilters(t: any): boolean {
       if (!r || r.serValid) return false
     }
   }
-  // 平台评价
   if (appliedFilters.filterEval) {
     const title = t.remote?._links?.customField62?.title || ''
     if (appliedFilters.filterEval === '其他') {
@@ -481,10 +470,9 @@ function matchesFilters(t: any): boolean {
       if (title !== appliedFilters.filterEval) return false
     }
   }
-  // 添加日期筛选：serDate 与选择器值同为 YYYY-MM-DD，可直接按字典序比较
+  // 添加日期：serDate 与选择器值同为 YYYY-MM-DD，可按字典序比较
   const [addedFrom, addedTo] = appliedFilters.filterAddedDate || []
   if (addedFrom && addedTo && (t.serDate < addedFrom || t.serDate > addedTo)) return false
-  // 文本项目多选：非空时只保留选中的项目
   if (appliedFilters.filterProjects.length && !appliedFilters.filterProjects.includes(t.rawProjectName)) return false
   if (appliedFilters.filterHandlers.length && !appliedFilters.filterHandlers.includes(t.rawHandler)) return false
   if (
@@ -501,8 +489,7 @@ function matchesFilters(t: any): boolean {
 }
 
 /**
- * 将筛选栏当前编辑的条件同步为生效条件
- * 仅在点击搜索、重置或筛选栏回显完成后调用，避免条件变更立即影响列表
+ * 将筛选栏编辑中的条件同步为生效条件，避免条件变更立即影响列表
  */
 function syncAppliedFilters() {
   Object.assign(appliedFilters, {
@@ -515,27 +502,22 @@ function syncAppliedFilters() {
 }
 
 /**
- * 筛选栏回显持久化条件后同步为生效条件
- * 只同步不再查库：高级筛选为本地过滤，快照更新后列表即时生效；日期范围已按存储值加载
+ * 筛选栏回显持久化条件后同步为生效条件，只同步不查库，日期范围已按存储值加载
  */
 function onFilterRestored() {
   syncAppliedFilters()
   computeStatsCache()
 }
 
-// 关键字与列筛选命中的任务，展示、统计、同步共用一次过滤结果
 const matchedTasks = computed<DisplayTask[]>(() => {
   return allDisplayTasks.value.filter((t) => matchesKeyword(t) && matchesFilters(t))
 })
 
-// 有效任务列表（排除延期任务），统计与导出范围内使用该口径
 const activeTasks = computed<DisplayTask[]>(() => matchedTasks.value.filter((t) => !t.serPostponed))
 
-// 同步/检查范围内任务列表（包含延期任务）
-// 延期任务需要参与同步与检查，仅统计/导出/删除范围内排除
+// 同步与检查范围包含延期任务，仅统计、导出、删除排除
 const syncableTasks = computed<DisplayTask[]>(() => matchedTasks.value)
 
-// 表格展示列表（包含延期任务）
 const displayTasks = computed<DisplayTask[]>(() => matchedTasks.value)
 
 const selectedTasks = computed(() => selection.value)
@@ -545,7 +527,6 @@ const pagedTasks = computed(() => {
   return displayTasks.value.slice(start, start + pageSize.value)
 })
 
-// 工具栏状态，驱动 ToolBar 组件的按钮可用状态与提示标签
 const toolbarState = computed<ToolbarState>(() => ({
   selectedCount: selection.value.length,
   pageCount: pagedTasks.value.length,
@@ -561,7 +542,6 @@ const toolbarState = computed<ToolbarState>(() => ({
   lastBackupTime: lastBackupTime.value,
 }))
 
-// 统计数据缓存，合并 stats、detailRows、chartData 的计算
 const statsCache = shallowRef<{
   stats: {
     totalTasks: number
@@ -581,7 +561,6 @@ const statsCache = shallowRef<{
   chartData: Array<{ label: string; prev: number; curr: number }>
 } | null>(null)
 
-// 一次性计算所有统计数据
 function computeStatsCache() {
   const tasks = activeTasks.value
   const prevTasks = prevDays.value.flatMap((d) => d.tasks).filter((t) => !t.serPostponed)
@@ -656,10 +635,8 @@ const stats = computed(
 const detailRows = computed(() => statsCache.value?.detailRows || [])
 const chartData = computed(() => statsCache.value?.chartData || [])
 
-// 分页大小列表（使用共享常量）
 const pageSizeList = computed(() => PAGE_SIZE_LIST)
 
-// 当前生效日期范围是否包含今天
 const containsToday = computed(() => {
   if (!appliedFilters.dateRange?.[0] || !appliedFilters.dateRange?.[1]) return false
   const today = new Date()
@@ -678,10 +655,6 @@ function pct(cur: number, prev: number): number | null {
   return prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null
 }
 
-/**
- * 打开延期标记弹窗
- * @param task 目标任务
- */
 function openPostponeDialog(task: DisplayTask) {
   const formData = {
     postponed: task.serPostponed || false,
@@ -700,10 +673,6 @@ function openPostponeDialog(task: DisplayTask) {
   )
 }
 
-/**
- * 打开执行优先级标记弹窗
- * @param {DisplayTask} task 目标任务
- */
 function openPriorityDialog(task: DisplayTask) {
   const formData = {
     priority: task.serPriority || null,
@@ -720,10 +689,6 @@ function openPriorityDialog(task: DisplayTask) {
   )
 }
 
-/**
- * 打开限时任务标记弹窗
- * @param {DisplayTask} task 目标任务
- */
 function openTimeLimitDialog(task: DisplayTask) {
   const formData = {
     timeLimit: task.serTimeLimit || null,
@@ -742,7 +707,6 @@ function openTimeLimitDialog(task: DisplayTask) {
 // #endregion
 
 // #region 数据加载与筛选
-// 日期范围持久化存储键名
 const DATE_RANGE_STORAGE_KEY = 'historyDateRange'
 
 /**
@@ -767,14 +731,12 @@ function persistDateRange() {
   ipc.storeSet(DATE_RANGE_STORAGE_KEY, [start.toISOString(), end.toISOString()])
 }
 
-// 分页状态持久化存储键名
 const PAGINATION_STORAGE_KEY = 'historyPagination'
 // 回显完成前不落盘，避免加载时的页码归位覆盖上次记录
 let paginationRestored = false
 
 /**
- * 回显上次的页码与每页条数
- * 页码超出当前总页数时归位到最后一页
+ * 回显上次的页码与每页条数，页码超出总页数时归位到最后
  */
 async function restorePagination() {
   const saved = await ipc.storeGet(PAGINATION_STORAGE_KEY)
@@ -826,7 +788,6 @@ async function loadRange() {
   const prevStart = addDays(prevEnd, -(duration - 1))
   prevRangeLabel.value = `${formatYMD(prevStart)} ~ ${formatYMD(prevEnd)}`
 
-  // 并行请求当前周期和上一周期数据
   const [cur, prev] = await Promise.all([
     ipc.queryHistory({ startDate: start, endDate: end }),
     ipc.queryHistory({ startDate: formatYMD(prevStart), endDate: formatYMD(prevEnd) }),
@@ -840,8 +801,7 @@ async function loadRange() {
 }
 
 /**
- * 执行搜索：先把筛选栏当前条件同步为生效条件，再按生效条件取数
- * 有关键字且选全部历史时查全量数据，其余情况按日期范围取数
+ * 执行搜索：先同步筛选栏条件为生效条件，有关键字且选全部历史时查全量，其余按日期范围取数
  */
 async function onSearch() {
   if (searching.value) return
@@ -876,9 +836,8 @@ async function onSearch() {
 onMounted(async () => {
   // 先回显上次保存的日期范围，再基于该范围加载数据
   await restoreDateRange()
-  // 初始生效条件与回显后的日期范围保持一致，筛选栏回显完成后会再次同步
+  // 初始生效条件对齐回显的日期范围，筛选栏回显完成后还会再次同步
   syncAppliedFilters()
-  // 并行加载范围数据和辅助状态
   const [, bt, backupVal, st] = await Promise.all([
     loadRange(),
     ipc.storeGet('lastBackupTime'),
@@ -895,13 +854,12 @@ onMounted(async () => {
   // 设置中修改自动同步开关或间隔后重启定时器，无需重新进页即可生效
   unsubscribeAutoSync = ipc.onAutoSyncSettingsChanged(() => restartAutoSync(true))
 
-  // 主进程自动备份完成后刷新上次备份时间
   unsubscribeBackup = ipc.onBackupCompleted(async () => {
     const bt = await ipc.storeGet('lastBackupTime')
     lastBackupTime.value = bt ? new Date(bt).toLocaleString() : ''
   })
 
-  // 窗口关闭前兜底落盘未保存修改（渲染进程销毁前 IPC 消息已入队主进程）
+  // 关窗前兜底落盘（渲染进程销毁前 IPC 已入队主进程）
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -944,7 +902,7 @@ function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 let saveDebounce: ReturnType<typeof setTimeout> | null = null
-// 内存数据结构版本号，删除操作时递增，用于检测在途 flush 期间的结构变更
+// 内存结构版本号，删除时递增，用于检测在途 flush 期间的结构变更
 let dataVersion = 0
 watch(dirty, (v) => {
   if (!v) return
@@ -973,7 +931,7 @@ function onSelectionChange(sel: any[]) {
 }
 
 /**
- * 按当前生效的搜索关键字过滤日期数据，与主进程查询逻辑保持一致
+ * 按生效的搜索关键字过滤日期数据
  * @param {HistoryDay[]} days 日期数据列表
  * @returns {HistoryDay[]} 过滤后的日期数据列表
  */
@@ -1018,8 +976,7 @@ async function handleSaveRange(silent = false) {
 
 // #region 删除任务
 /**
- * 读取某日期的完整历史任务数据
- * 删除场景必须基于完整数据写回，避免全部历史搜索模式下过滤子集覆盖磁盘导致未匹配任务丢失
+ * 读取某日期的完整任务数据；删除须基于完整数据写回，避免搜索子集覆盖磁盘
  * @param {string} date 日期（YYYY-MM-DD）
  * @returns {Promise<any[]>} 完整任务列表，文件不存在时为空数组
  */
@@ -1043,12 +1000,11 @@ async function handleDeleteRange() {
         cancelButtonText: '取消',
       },
     )
-    // 统一口径：范围内删除仅针对非延期任务，延期任务保留（与同步/导出/统计排除延期一致）
-    // 延期任务可通过「删除选中」或行内删除精确移除
+    // 范围内删除仅针对非延期任务，延期任务保留，可经「删除选中」或行内删除移除
     const saveBatch: Array<{ date: string; data: HistoryDay }> = []
     const deleteDates: string[] = []
     for (const day of loadedDays.value) {
-      // 当前筛出的任务中，删除非延期部分；延期任务与未匹配任务保留
+      // 删除非延期部分；延期与未匹配任务保留
       const deleteIds = new Set(day.tasks.filter((t: any) => !t.serPostponed).map((t: any) => t.serId))
       const fullTasks = await loadFullTasks(day.date)
       const remaining = fullTasks.filter((t: any) => !deleteIds.has(t.serId))
@@ -1088,7 +1044,6 @@ async function handleDeleteSelected() {
     })
     const taskIds = new Set(tasks.map((t) => t.serId))
 
-    // 批量准备需要保存的数据
     const saveBatch: Array<{ date: string; data: HistoryDay }> = []
     const deleteDates: string[] = []
 
@@ -1135,7 +1090,7 @@ async function removeTask(task: any) {
       day.tasks.splice(idx, 1)
       // 结构变更后递增版本号，通知在途 flush 使用最新内存重新合并
       dataVersion++
-      // 基于磁盘完整数据删除，避免全部历史搜索模式下过滤子集覆盖导致同日期未匹配任务丢失
+      // 基于磁盘完整数据删除，避免搜索子集覆盖导致同日期未匹配任务丢失
       const fullTasks = await loadFullTasks(day.date)
       const remaining = fullTasks.filter((t: any) => t.serId !== task.serId)
       if (remaining.length === 0) {
@@ -1194,7 +1149,7 @@ async function doCheck(tasks: Array<{ task: HistoryTaskItem }>) {
     },
     {
       signal: {
-        // 通过 getter 将中止信号 ref 映射为服务层要求的 aborted 属性
+        // getter 把中止信号 ref 映射为 aborted 属性
         get aborted() {
           return abortCheck.value
         },
@@ -1210,7 +1165,6 @@ async function doCheck(tasks: Array<{ task: HistoryTaskItem }>) {
           return
         }
         task.serCheckResult = o.result
-        // 拉取到远程数据后统一标记为已同步
         if (o.result?.remote && task.serSyncStatus === 'none') {
           task.serSyncStatus = 'synced'
         }
@@ -1234,13 +1188,11 @@ async function doCheck(tasks: Array<{ task: HistoryTaskItem }>) {
   return { count, passed, failed }
 }
 
-// 组装同步完成通知正文，失败数大于 0 时在正文中体现
 function buildSyncNotifyBody(synced: number, total: number): string {
   const failed = total - synced
   return failed > 0 ? `成功 ${synced} 条，失败 ${failed} 条` : `成功 ${synced}/${total} 条`
 }
 
-// 组装检查完成通知正文，未通过与异常数大于 0 时在正文中体现
 function buildCheckNotifyBody(passed: number, failed: number, total: number): string {
   const skipped = total - passed - failed
   let body = `通过 ${passed}/${total} 条`
@@ -1302,11 +1254,6 @@ async function handleCheckRange() {
 
 // #region 编辑与校验详情
 
-/**
- * 根据任务字段重建 raw 文本
- * @param task 任务对象
- * @returns 重建后的 raw 字符串
- */
 function rebuildRaw(task: HistoryTaskItem): string {
   const scoreBracket = task.rawScore ? `【${task.rawScore}】` : ''
   return `${task.rawSeq}.${task.rawProjectName}-【${task.rawTitle}-${task.rawHandler}】 ${task.rawUrl}${scoreBracket}`
@@ -1330,7 +1277,7 @@ function openEditDialog(row: DisplayTask) {
         rebuildAllDisplayTasks()
         computeStatsCache()
         logStore.addLog('success', '已修改')
-        // 编辑后重新校验该条任务，避免校验标签与内容脱节（与导出页行为一致）
+        // 编辑后重新校验该条任务，避免校验标签与内容脱节
         revalidateHistoryTask(updated.serId)
       },
     },
@@ -1338,7 +1285,7 @@ function openEditDialog(row: DisplayTask) {
 }
 
 /**
- * 单条历史任务重新校验（编辑后调用），保持校验结果与编辑后的内容一致
+ * 单条历史任务重新校验，保持校验结果与编辑后的内容一致
  * @param {string} taskId 任务 ID
  */
 async function revalidateHistoryTask(taskId: string) {
@@ -1464,7 +1411,7 @@ async function handleSync() {
       const localProject = found.rawProjectName
       found.rawTitle = r.remote.subject || found.rawTitle
       found.rawProjectName = r.remote._embedded?.project?.name || found.rawProjectName
-      // 远程数据与本地内容不一致时以平台数据为准覆盖本地
+      // 远程与本地不一致时以平台数据为准
       const changed = found.rawTitle !== localTitle || found.rawProjectName !== localProject
       found.serSyncStatus = 'synced'
       if (changed) {
@@ -1594,11 +1541,10 @@ async function handleExportRange() {
 }
 
 function doCopyTask(withEst: boolean) {
-  // 有勾选时只复制勾选的，无勾选时复制当前页全部任务
   const tasks = selectedTasks.value.length ? selectedTasks.value : pagedTasks.value
   if (!tasks.length) return
   const lines = tasks.map((t, i) => {
-    // 按字段重建行文本（与 rebuildRaw 格式一致），避免基于 raw 的正则替换误伤标题括号
+    // 按字段重建行文本，避免基于 raw 的正则替换误伤标题括号
     const scoreBracket = t.rawScore ? `【${t.rawScore}】` : ''
     const estTag = withEst && t.remote?.estimatedTime ? `【${convertIso8601ToHours(t.remote.estimatedTime)}】` : ''
     return `${i + 1}.${estTag}${t.rawProjectName}-【${t.rawTitle}-${t.rawHandler}】 ${t.rawUrl}${scoreBracket}`
@@ -1634,7 +1580,7 @@ async function handleRestoreBackup() {
   try {
     const { count, conflictCount } = await ipc.restoreHistoryFromDir()
     if (count > 0) {
-      // 冲突日期只是提示，恢复本身已按每个日期一份完成
+      // 冲突日期仅提示，恢复已按每日期一份完成
       const conflictTip = conflictCount > 0 ? `，另有 ${conflictCount} 个日期在备份目录里有多份，已各取最新的一份` : ''
       logStore.addLog('success', `已从备份目录恢复 ${count} 个历史文件${conflictTip}`)
       await loadRange()
@@ -1693,7 +1639,7 @@ function stopAutoSync() {
 
 /**
  * 重启自动同步定时器
- * @param skipImmediate 设为 true 跳过页面加载时的周期判断，仅保留周期定时
+ * @param skipImmediate true 时跳过页面加载的周期判断
  */
 async function restartAutoSync(skipImmediate = false) {
   stopAutoSync()
@@ -1839,7 +1785,7 @@ function handleCopyCmd(cmd: string) {
 }
 </style>
 
-<!-- 抽屉拖拽调整宽度的样式，抽屉 teleport 到 body 后 scoped 无法命中，需使用非 scoped -->
+<!-- 抽屉拖拽调宽样式：抽屉 teleport 到 body 后 scoped 无法命中，须用非 scoped -->
 <style>
 .drawer-resize-handle {
   position: absolute;

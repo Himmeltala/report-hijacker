@@ -33,7 +33,6 @@
       </div>
     </div>
 
-    <!-- 统计栏 -->
     <div v-if="tasks.length" class="stats-bar">
       <span class="stat-item"
         >管理平台自评时长 <strong>{{ stats.totalSelfHours }}</strong
@@ -69,8 +68,6 @@
       @update="handleUpdateTask"
       @detail="showDetail"
     />
-
-    <!-- 校验详情弹窗（由 useModal 管理） -->
   </div>
 </template>
 
@@ -113,7 +110,6 @@ const tasks = computed(() => taskStore.tasks)
 const unrecognizedLines = computed(() => taskStore.unrecognizedLines)
 const validationResults = computed(() => taskStore.validationResults)
 
-// 统计栏数据
 const stats = computed(() =>
   computeTaskStats(
     tasks.value,
@@ -121,7 +117,7 @@ const stats = computed(() =>
   ),
 )
 
-// 评论区检查结果存于任务 store，切换路由后保留，与校验结果生命周期一致
+// 评论区检查结果存于任务 store，切换路由后保留
 const { commentCheckResults } = storeToRefs(taskStore)
 
 function showDetail(index: number) {
@@ -131,8 +127,6 @@ function showDetail(index: number) {
     commentMatchMode: store.config.commentMatchMode || 'all',
   })
 }
-
-// TaskTable 的 @detail 事件直接调用 showDetail，不再使用全局 window 事件
 
 function handleParse() {
   if (!rawText.value.trim()) return
@@ -337,7 +331,7 @@ function handleUpdateTask(index: number, data: Partial<TaskItem>) {
 }
 
 function handleRemoveTask(index: number) {
-  // removeTask 已同步移除校验与评论检查结果，保持索引对齐
+  // 删除任务时同步移除其校验与评论检查结果，保持索引对齐
   taskStore.removeTask(index)
   logStore.addLog('info', `删除任务 #${index + 1}`)
 }

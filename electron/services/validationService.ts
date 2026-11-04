@@ -19,7 +19,7 @@ import { validateWorkPackage, type WorkPackageExpectations } from '@/services/va
  * 注册任务校验与评论区检查 IPC
  * @param {object} api API 客户端
  * @param {object} deps 依赖项
- * @param {() => AppSettings} deps.getSettings 获取当前设置实例（「设置值」来源按 schema 注入配置值）
+ * @param {() => AppSettings} deps.getSettings 获取当前设置实例（「设置值」类规则按 schema 注入设置值）
  */
 export function setupValidationIpc(api: ApiClient, deps: { getSettings: () => AppSettings }): void {
   const { getSettings } = deps
@@ -64,9 +64,8 @@ export function setupValidationIpc(api: ApiClient, deps: { getSettings: () => Ap
       return result
     }
 
-    // 校验规则由共享纯函数模块执行，主进程只负责取数和透传
-    // 「设置值」来源的规则按设置键取预期值：把 schema 中 compareCandidate 设置项的值
-    // 以完整设置键为属性名注入 exp，引擎 resolveExpected 按 expectedKey 直接取值
+    // 「设置值」类规则取 schema 中 compareCandidate 设置项的值，以完整设置键为属性名注入 exp
+    // 引擎 resolveExpected 按 expectedKey 直接取值
     const exp: WorkPackageExpectations & Record<string, any> = {
       taskId,
       rawSeq,
@@ -95,7 +94,7 @@ export function setupValidationIpc(api: ApiClient, deps: { getSettings: () => Ap
     result.serValid = validation.serValid
     result.serBoundaryResults = validation.serBoundaryResults
     result.serBoundaryMatchMode = validation.serBoundaryMatchMode
-    // 透传完整原始 API 响应，消费端直接导航 subject / _embedded.status.name / _links.type.title 等
+    // 透传完整原始 API 响应，不裁剪字段
     result.remote = detail
     return result
   })
@@ -109,10 +108,10 @@ export function setupValidationIpc(api: ApiClient, deps: { getSettings: () => Ap
     if (!taskId || !cookie) throw new Error('缺少 taskId 或 cookie')
 
     try {
-      // 透传完整原始 API 响应，消费端直接导航 _embedded.elements[]._type / comment.raw
+      // 透传完整原始 API 响应，不裁剪字段
       return await api.get(`/api/v3/work_packages/${taskId}/activities`, cookie)
     } catch (e: any) {
-      // 404 表示任务无活动记录，返回空数据供消费端继续走匹配流程
+      // 404 表示任务无活动记录，返回空数据
       if (String(e.message).includes('404')) {
         return { _type: 'Collection', total: 0, count: 0, _embedded: { elements: [] }, _links: {} }
       }

@@ -8,12 +8,7 @@
  */
 import { contextBridge, ipcRenderer } from 'electron'
 
-/**
- * 注册 IPC 事件监听并返回取消订阅函数
- * @param {string} channel IPC 通道名
- * @param {Function} callback 回调函数
- * @returns {Function} 取消订阅函数
- */
+/** 注册 IPC 事件监听，返回取消订阅函数 */
 function subscribe(channel: string, callback: (...args: any[]) => void): () => void {
   const handler = (_e: any, ...args: any[]) => callback(...args)
   ipcRenderer.on(channel, handler)
@@ -33,7 +28,7 @@ contextBridge.exposeInMainWorld('electron', {
   // #region 校验任务
   validateTask: (params: any) => ipcRenderer.invoke('api:validateTask', params),
   checkComments: (params: any) => ipcRenderer.invoke('api:checkComments', params),
-  aiReview: (params: any) => ipcRenderer.invoke('ai:review', params),
+  aiChat: (params: any) => ipcRenderer.invoke('ai:chat', params),
   // #endregion
 
   // #region 通知

@@ -15,10 +15,13 @@ import type { ValidateTaskParams } from '@/types/ipc'
 // #region 任务校验
 
 /**
- * 校验单个任务（调用主进程校验接口）
+ * 校验单个任务
+ * @param {string} rawSeq 期望序号
  * @param {string} rawProjectName 期望项目名称
  * @param {string} rawTitle 期望任务标题
  * @param {string} rawScore 期望工时分数
+ * @param {string} rawEstimatedHours 期望工时
+ * @param {string} rawRemark 期望备注
  * @param {string} rawUrl 任务链接
  * @param {string} cookie 登录 Cookie
  * @param {string} handlerName 处理人
@@ -53,7 +56,7 @@ export async function validateTask(
     rawUrl,
     cookie,
     handlerName,
-    // 深拷贝避免 Vue reactive Proxy 无法通过 IPC 结构化克隆
+    // 深拷贝，规避 Vue reactive Proxy 无法结构化克隆
     checkRules: JSON.parse(JSON.stringify(checkRules || [])),
     boundaryRules: JSON.parse(JSON.stringify(boundaryRules || [])),
     boundaryMatchMode,
@@ -68,7 +71,7 @@ export async function validateTask(
 
 /**
  * 获取任务评论区原始数据（透传 API 响应）
- * 消费端直接导航返回值的 _embedded.elements[]._type / comment.raw
+ * 响应含 _embedded.elements[]._type 与 comment.raw 字段
  * @param {string} taskId 任务 ID
  * @param {string} cookie 登录 Cookie
  * @returns {Promise<ActivitiesResponse>} 活动列表响应

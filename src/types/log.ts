@@ -9,7 +9,6 @@
 
 // #region 日志类型
 
-// 日志条目
 export interface LogEntry {
   type: 'info' | 'success' | 'warning' | 'error'
   message: string

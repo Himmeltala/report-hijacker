@@ -48,10 +48,8 @@ const props = defineProps<{
   mode: MatchMode
 }>()
 
-// 匹配模式文字（all 全部匹配 / any 任一匹配）
 const modeLabel = computed(() => (props.mode === 'all' ? '全部匹配' : '任一匹配'))
 
-// 总体通过状态
 const overallPassed = computed(() => isRulesPassed(props.results, props.mode))
 </script>
 

@@ -12,7 +12,6 @@ import type { BrowserWindow } from 'electron'
 
 // #region 类型定义
 
-/** 系统通知构造参数 */
 export interface SysNotificationParams {
   title: string
   body: string

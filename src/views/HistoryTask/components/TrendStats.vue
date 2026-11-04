@@ -78,7 +78,6 @@ async function loadTrend() {
       for (let d = 1; d <= lastDay; d++) dates.push(`${cal}-${String(d).padStart(2, '0')}`)
     }
 
-    // 按时间点统计各项目任务数
     const dateProjects = new Map<string, Map<string, number>>()
     const projectTotal = new Map<string, number>()
     for (const day of days) {

@@ -11,7 +11,6 @@ import { convertIso8601ToHours } from '@/utils/parser'
 
 // #region 类型定义
 
-// 统计结果
 export interface TaskStats {
   totalTasks: number
   totalSelfHours: number
@@ -22,8 +21,7 @@ export interface TaskStats {
   evalOther: number
 }
 
-// 远程工作包数据的最小形状（remote 与 remote 同源）
-// 字段类型与 RawWorkPackage 兼容：customField 系列平台返回数字，也可能为字符串
+// 远程工作包数据的最小形状：customField 系列平台返回数字，也可能为字符串，字段类型与 RawWorkPackage 兼容
 export interface StatsRemote {
   estimatedTime?: string
   customField105?: string | number
@@ -39,7 +37,6 @@ export interface StatsRemote {
 // #region 统计计算
 
 /**
- * 计算任务统计汇总
  * @param {Array<{rawScore?: string}>} tasks 任务列表，用于统计任务数和总分
  * @param {Array<StatsRemote | null | undefined>} remotes 远程工作包数据列表（与 tasks 对应）
  * @returns {TaskStats} 统计结果
@@ -56,7 +53,7 @@ export function computeTaskStats(
   const evalTitle = (r: StatsRemote | null | undefined) => r?._links?.customField62?.title || ''
   const evalGood = remotes.filter((r) => evalTitle(r) === '好').length
   const evalPass = remotes.filter((r) => evalTitle(r) === '合格').length
-  // 其他含未评价任务，保证 好/合格/其他 三者合计等于任务数
+  // 其他含未评价任务，保证好、合格、其他三者合计等于任务数
   const evalOther = remotes.filter((r) => {
     const title = evalTitle(r)
     return title !== '好' && title !== '合格'

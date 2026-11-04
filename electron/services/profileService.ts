@@ -15,8 +15,7 @@ import { readJsonFile } from '@electron/utils'
 // #region 辅助函数
 
 /**
- * 校验档案名称，非法时抛错；返回去除首尾空白后的安全名称
- * 拒绝路径分隔符、Windows 保留字符、相对路径（. 与 ..）及以空格或点结尾的名称
+ * 校验档案名称，非法时抛错：拒绝路径分隔符、Windows 保留字符、相对路径及以空格或点结尾的名称
  * @param {string} name 档案名称
  * @returns {string} 校验通过后的档案名
  */
@@ -31,11 +30,10 @@ function assertValidProfileName(name: string): string {
 }
 
 /**
- * 检查档案名与现有列表是否存在大小写不敏感重复
- * Windows 文件系统不区分大小写，A 与 a 会映射到同一目录导致数据互相覆盖
+ * 检查档案名与现有列表是否大小写不敏感重复，Windows 不区分大小写时重名会覆盖目录
  * @param {string[]} list 现有档案名列表
  * @param {string} name 待检查名称
- * @param {string} [exclude] 需要排除的档案名（如重命名时的原名）
+ * @param {string} [exclude] 需要排除的档案名
  * @returns {boolean} 存在冲突时为 true
  */
 function hasNameConflict(list: string[], name: string, exclude?: string): boolean {
@@ -47,35 +45,22 @@ function hasNameConflict(list: string[], name: string, exclude?: string): boolea
 
 // #region 路径工具
 
-/** 获取档案列表文件路径 */
 function getProfilesListPath(): string {
   return join(app.getPath('userData'), 'profiles.json')
 }
 
-/** 获取当前激活档案文件路径 */
 function getActiveProfilePath(): string {
   return join(app.getPath('userData'), 'active-profile.json')
 }
 
-/** 获取所有档案目录基础路径 */
 function getProfilesBaseDir(): string {
   return join(app.getPath('userData'), 'profiles')
 }
 
-/**
- * 获取指定档案的数据目录
- * @param {string} name 档案名称
- * @returns {string} 档案目录路径
- */
 export function getProfileDir(name: string): string {
   return join(getProfilesBaseDir(), name)
 }
 
-/**
- * 获取指定档案的 settings.json 完整路径
- * @param {string} name 档案名称
- * @returns {string} settings.json 路径
- */
 export function getProfileSettingsPath(name: string): string {
   return join(getProfileDir(name), 'settings.json')
 }
@@ -84,17 +69,13 @@ export function getProfileSettingsPath(name: string): string {
 
 // #region 档案读写
 
-/**
- * 读取当前激活的档案名称
- * @returns {string} 档案名称
- */
 function readActiveProfile(): string {
   const data = readJsonFile<{ name?: string }>(getActiveProfilePath(), {})
   return data.name || ''
 }
 
 /**
- * 写入当前激活的档案名称（原子写入，崩溃时不会留下截断文件）
+ * 写入当前激活档案名，原子写入避免崩溃留下截断文件
  * @param {string} name 档案名称
  */
 function writeActiveProfile(name: string): void {
@@ -104,24 +85,16 @@ function writeActiveProfile(name: string): void {
   renameSync(tmpPath, getActiveProfilePath())
 }
 
-/**
- * 读取所有档案名称列表
- * @returns {string[]} 档案名称列表
- */
 function readProfilesList(): string[] {
   return readJsonFile<string[]>(getProfilesListPath(), [])
 }
 
-/**
- * 写入档案名称列表
- * @param {string[]} names 档案名称列表
- */
 function writeProfilesList(names: string[]): void {
   writeFileSync(getProfilesListPath(), JSON.stringify(names), 'utf-8')
 }
 
 /**
- * 创建档案目录结构（含 history / store 子目录）
+ * 创建档案目录，含 history 与 store 子目录
  * @param {string} name 档案名称
  */
 function ensureProfileDir(name: string): void {
@@ -136,19 +109,16 @@ function ensureProfileDir(name: string): void {
 // #region 初始化
 
 /**
- * 初始化档案系统：确定当前激活的档案
- * 无有效激活档案时创建默认档案
+ * 初始化档案系统，无有效激活档案时创建默认档案
  * @returns {string} 当前激活的档案名称
  */
 export function initProfileSystem(): string {
   const current = readActiveProfile()
 
-  // 已有激活档案且有效，直接返回
   if (current && readProfilesList().includes(current)) {
     return current
   }
 
-  // 全新启动：创建默认档案
   const defaultName = '默认用户'
   ensureProfileDir(defaultName)
   const list = readProfilesList()
@@ -168,7 +138,7 @@ export function initProfileSystem(): string {
  * 注册用户档案管理 IPC
  * @param {object} deps 依赖项
  * @param {() => string} deps.getActiveProfile 获取当前激活档案
- * @param {(name: string) => void} deps.onActivate 激活档案回调（重建设置、重启备份、通知渲染进程）
+ * @param {(name: string) => void} deps.onActivate 激活档案回调
  */
 export function setupProfileIpc(deps: { getActiveProfile: () => string; onActivate: (name: string) => void }): void {
   const { getActiveProfile, onActivate } = deps
@@ -209,18 +179,15 @@ export function setupProfileIpc(deps: { getActiveProfile: () => string; onActiva
     const list = readProfilesList()
     if (!list.includes(oldName)) throw new Error(`档案 "${oldName}" 不存在`)
     if (list.includes(trimmed)) throw new Error(`档案 "${trimmed}" 已存在`)
-    // 大小写不敏感冲突检查（排除原名自身，允许纯大小写调整）
+    // 冲突检查排除原名，允许纯大小写调整
     if (hasNameConflict(list, trimmed, oldName)) throw new Error(`档案 "${trimmed}" 与现有档案名称冲突`)
-    // 重命名目录
     const oldDir = getProfileDir(oldName)
     const newDir = getProfileDir(trimmed)
     if (existsSync(oldDir)) {
       renameSync(oldDir, newDir)
     }
-    // 更新列表
     const newList = list.map((n) => (n === oldName ? trimmed : n))
     writeProfilesList(newList)
-    // 如果重命名的是当前激活的档案
     if (getActiveProfile() === oldName) {
       writeActiveProfile(trimmed)
       onActivate(trimmed)
@@ -233,14 +200,12 @@ export function setupProfileIpc(deps: { getActiveProfile: () => string; onActiva
     const list = readProfilesList()
     if (!list.includes(name)) throw new Error(`档案 "${name}" 不存在`)
     if (list.length <= 1) throw new Error('至少保留一个档案')
-    // 删除档案目录
     const dir = getProfileDir(name)
     if (existsSync(dir)) {
       rmSync(dir, { recursive: true, force: true })
     }
     const newList = list.filter((n) => n !== name)
     writeProfilesList(newList)
-    // 如果删除的是当前激活的档案，切换到第一个
     if (getActiveProfile() === name) {
       writeActiveProfile(newList[0])
       onActivate(newList[0])

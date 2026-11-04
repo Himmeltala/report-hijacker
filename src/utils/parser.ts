@@ -42,8 +42,7 @@ export function validateRegexGroups(pattern: string): string[] {
 /**
  * 解析原始文本，返回任务列表和未识别行
  * @param text 原始文本
- * @param regexStr 正则表达式字符串（来自设置 parsing.taskRegex）
- * @returns 解析结果
+ * @param regexStr 正则表达式字符串
  */
 export function parseTaskText(text: string, regexStr: string): { tasks: TaskItem[]; unrecognized: string[] } {
   let regex: RegExp
@@ -64,14 +63,14 @@ export function parseTaskText(text: string, regexStr: string): { tasks: TaskItem
 
   let lineNumber = 0
   for (const line of text.split('\n')) {
-    // 行号始终按原始行递增，空行也占位，保证与输入文本行号一致
+    // 空行也占位，行号与输入文本保持一致
     lineNumber++
     const trimmed = line.trim()
     if (!trimmed) continue
 
     const match = trimmed.match(regex)
     if (match?.groups) {
-      // 必填具名组必须在正则中定义（值允许为空，如可选的自评工时前缀），与 RegexTester 校验一致
+      // 必填具名组必须在正则中定义，值允许为空
       const missing = EXPECTED_GROUPS.filter((g) => !(g in (match.groups as Record<string, string>)))
       if (missing.length > 0) {
         unrecognized.push(trimmed)
@@ -79,7 +78,7 @@ export function parseTaskText(text: string, regexStr: string): { tasks: TaskItem
       }
       const g = match.groups
       const remarkRaw = (g.remark || '').trim()
-      // 处理人从备注末尾提取（与提取页一致），标题剥离处理人部分
+      // 处理人从备注末尾提取，标题剥离处理人部分
       const handler = extractHandler(remarkRaw)
       const title = handler ? remarkRaw.slice(0, -(handler.length + 1)).trim() : remarkRaw
       tasks.push({
@@ -108,7 +107,7 @@ export function parseTaskText(text: string, regexStr: string): { tasks: TaskItem
 
 /**
  * 从备注文本末尾提取处理人（最后一个 - 之后的部分）
- * @param {string} remark 备注文本（如「完成登录-张三」）
+ * @param {string} remark 备注文本
  * @returns {string} 处理人姓名，无分隔符时返回空字符串
  */
 export function extractHandler(remark: string): string {
@@ -117,8 +116,8 @@ export function extractHandler(remark: string): string {
 }
 
 /**
- * 将时长字符串转为小时数（ISO 8601 或纯数字小时，与校验引擎 rules 共用 parseHoursValue）
- * @param {string} isoDuration 时长字符串，如 PT8H / PT30M / P1D / "6"
+ * 将时长字符串转为小时数（ISO 8601 或纯数字小时）
+ * @param {string} isoDuration 时长字符串
  * @returns {number} 小时数，天按 24 小时折算
  */
 export function convertIso8601ToHours(isoDuration: string | undefined): number {
@@ -127,9 +126,9 @@ export function convertIso8601ToHours(isoDuration: string | undefined): number {
 
 /**
  * 格式化 ISO8601 时长字符串，按格式占位符输出天、时、分
- * @param {string} isoDuration ISO8601 时长，如 P2D、P1DT2H
+ * @param {string} isoDuration ISO8601 时长
  * @param {string} [format] 格式模板，占位符 d 天、h 时、m 分，默认 "d天h时"
- * @returns {string} 格式化结果，空值返回空字符串
+ * @returns {string} 空值返回空字符串
  */
 export function formatIso8601Duration(isoDuration: string, format = 'd天h时'): string {
   if (!isoDuration) return ''

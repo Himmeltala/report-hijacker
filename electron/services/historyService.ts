@@ -24,11 +24,6 @@ import {
 } from '@electron/services/historyPaths'
 import type { ApiClient } from '@electron/services/apiClient'
 
-/**
- * 递归复制目录
- * @param {string} src 源目录
- * @param {string} dest 目标目录
- */
 function copyDirSync(src: string, dest: string): void {
   mkdirSync(dest, { recursive: true })
   const entries = readdirSync(src, { withFileTypes: true })
@@ -62,10 +57,7 @@ function writeJsonAtomic(filePath: string, data: any): void {
 }
 
 /**
- * 执行历史数据备份到指定目录列表
  * @param {string[]} dirs 备份目标目录列表
- * @param {() => string} getHistoryDir 获取历史目录
- * @param {() => string} getStoreDir 获取通用存储目录
  * @returns {number} 成功备份的目录数量
  */
 function performBackup(dirs: string[], getHistoryDir: () => string, getStoreDir: () => string): number {
@@ -88,13 +80,7 @@ function performBackup(dirs: string[], getHistoryDir: () => string, getStoreDir:
 
 /**
  * 注册历史任务相关 IPC
- * @param {object} deps 依赖项
- * @param {any} deps.api API 客户端
  * @param {() => any} deps.getSettings 获取当前设置实例（档案切换后可能被替换）
- * @param {() => string} deps.getHistoryDir 获取历史目录
- * @param {() => string} deps.getStoreDir 获取通用存储目录
- * @param {(dirs: string[], getHistoryDir: () => string, getStoreDir: () => string) => number} deps.performBackupFn 执行备份
- * @param {() => void} deps.restartBackup 重启备份定时器
  */
 export function setupHistoryIpc(deps: {
   api: ApiClient
@@ -141,12 +127,10 @@ export function setupHistoryIpc(deps: {
     pruneEmptyDateDirs(historyDir, date)
   })
 
-  // 把平铺的历史文件按年/月归档，供「工具 - 数据迁移」调用
   ipcMain.handle('history:migrateLayout', () => {
     return migrateHistoryLayout(getHistoryDir())
   })
 
-  // 按日期范围和关键词查询历史任务
   ipcMain.handle('history:query', async (_e, params) => {
     const { startDate, endDate, keyword } = params || {}
     const historyDir = getHistoryDir()
@@ -157,7 +141,7 @@ export function setupHistoryIpc(deps: {
       .filter((date) => (!startDate || date >= startDate) && (!endDate || date <= endDate))
       .sort()
 
-    // 并发读取，上限 QUERY_CONCURRENCY，避免同步读阻塞主进程
+    // 并发读取并设上限，避免阻塞主进程
     const results: Array<any | null> = new Array(dates.length)
     let nextIndex = 0
     const worker = async () => {
@@ -184,7 +168,7 @@ export function setupHistoryIpc(deps: {
     await Promise.all(Array.from({ length: Math.min(QUERY_CONCURRENCY, dates.length) }, () => worker()))
 
     const days = results.filter((d): d is any => d !== null)
-    // 日期升序返回，日期内按平台状态与类型排序，与渲染端共用同一比较器
+    // 日期升序返回，日期内按平台状态与类型排序
     for (const day of days) {
       const orderFields = (t: any) => ({
         status: t.remote?._embedded?.status?.name,
@@ -203,7 +187,7 @@ export function setupHistoryIpc(deps: {
     let nextIndex = 0
 
     /**
-     * 工作池任务：依次取任务请求远程详情，结果按原索引写回
+     * 依次取任务请求远程详情，结果按原索引写回
      */
     async function worker() {
       while (nextIndex < tasks.length) {
@@ -229,12 +213,10 @@ export function setupHistoryIpc(deps: {
       }
     }
 
-    // 并发上限 5 个请求
     await Promise.all(Array.from({ length: Math.min(SYNC_CONCURRENCY, tasks.length) }, () => worker()))
     return results
   })
 
-  // 从备份目录恢复历史任务
   ipcMain.handle('history:restoreFromDir', async () => {
     const result = await dialog.showOpenDialog({
       title: '选择备份目录',
@@ -243,7 +225,7 @@ export function setupHistoryIpc(deps: {
     if (result.canceled || !result.filePaths?.[0]) return { count: 0, conflictCount: 0 }
     const srcDir = result.filePaths[0]
     const historyDir = getHistoryDir()
-    // 源目录层级不可控（旧备份是平铺的，新备份带年/月），递归找日期文件，同一日期只取最新一份
+    // 源目录可能同时有平铺旧备份与年月分层新备份，递归查找日期文件
     const { sources, conflictCount } = pickRestoreSources(srcDir, listJsonFilesRecursive(srcDir))
     let count = 0
     for (const { date, relPath } of sources) {
@@ -260,7 +242,6 @@ export function setupHistoryIpc(deps: {
     return { count, conflictCount }
   })
 
-  // 立即备份
   ipcMain.handle('history:backupNow', async (_e, dirs?: string[]) => {
     const backupDirs = dirs || getSettings().get('history.backupDirectories', [])
     if (!backupDirs.length) return { success: false, message: '未设置备份目录' }

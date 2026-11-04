@@ -11,11 +11,10 @@ import type { ValidationResult, CommentRuleMatch } from '@/types/task'
 import type { CheckRule, CommentRule, MatchMode } from '@/types/config'
 import { validateTask, checkComments } from '@/utils/validator'
 import { matchTextRules } from '@/services/validationRules'
-import { aiReviewTask } from '@/utils/aiReview'
+import { aiChat, fillPrompt, getAiSetting, toPlainText, MAX_CONTEXT_CHARS } from '@/utils/ai'
 
 // #region 类型定义
 
-// 单条待校验任务的输入描述
 export interface TaskToValidate {
   rawSeq: string
   rawProjectName: string
@@ -27,7 +26,6 @@ export interface TaskToValidate {
   taskDate?: string
 }
 
-// 校验配置项
 export interface ValidateConfig {
   cookie: string
   handlerName: string
@@ -40,7 +38,6 @@ export interface ValidateConfig {
   aiEnabled?: boolean
 }
 
-// 单条任务的校验结果
 export interface TaskValidateOutcome {
   /** 原数组索引，批量中止时后续索引缺失 */
   index: number
@@ -56,7 +53,6 @@ export interface TaskValidateOutcome {
   error?: Error
 }
 
-// 批量校验选项
 export interface ValidateBatchOptions {
   /** 外部中止信号 */
   signal?: { aborted: boolean }
@@ -81,6 +77,30 @@ function extractCommentText(activities: any): string {
   return comments.map((c: any) => c.comment.raw).join('\n---\n')
 }
 
+// 任务审查模块提示词设置键（提示词按模块独立配置，连接配置统一全局）
+const TASK_REVIEW_PROMPT_KEY = 'ai.taskReview.prompt'
+
+/**
+ * 对单条任务执行 AI 审查：读取模块提示词模板，任务上下文替换占位符后调用 AI 通道
+ * @param {ValidationResult} result 校验结果（remote 含平台原始数据）
+ * @param {string | null} commentText 评论区文本，null 表示取数异常
+ * @returns {Promise<string>} 审查结论
+ */
+async function runAiReview(result: ValidationResult, commentText: string | null): Promise<string> {
+  const template = await getAiSetting(TASK_REVIEW_PROMPT_KEY)
+  if (!template.trim()) throw new Error('未配置审查提示词')
+  const remote = result.remote
+  const embedded = remote?._embedded || {}
+  const ctx = {
+    title: remote?.subject || '',
+    status: embedded.status?.name || remote?._links?.status?.title || '',
+    type: embedded.type?.name || remote?._links?.type?.title || '',
+    description: toPlainText(remote?.description?.raw || '').slice(0, MAX_CONTEXT_CHARS),
+    comments: (commentText || '').slice(0, MAX_CONTEXT_CHARS),
+  }
+  return aiChat(fillPrompt(template, ctx))
+}
+
 // #endregion
 
 // #region 批量校验
@@ -100,7 +120,7 @@ export async function validateBatch(
   const { signal, onTaskStart, onTaskComplete } = options
   const total = tasks.length
 
-  // 循环外预处理：评论区规则过滤与边界规则深拷贝只需一次
+  // 评论区规则过滤与边界规则深拷贝只需一次
   const activeCommentRules = config.commentRules.filter((r) => r.enabled && r.pattern)
   const commentMatchMode = config.commentMatchMode
   const boundaryRules = JSON.parse(JSON.stringify(config.boundaryRules))
@@ -129,18 +149,23 @@ export async function validateBatch(
         task.taskDate,
       )
 
+      // 有规则检查或 AI 审查需求时才取评论区文本，只取一次
       let commentMatches: CommentRuleMatch[] | null = null
       // 只对规则选中的任务类型执行，未选类型表示对全部类型生效
       const taskType = result.remote?._embedded?.type?.name || ''
       const applicableRules = activeCommentRules.filter((r) => !r.types?.length || r.types.includes(taskType))
-      if (applicableRules.length > 0 && result.serTaskId) {
+      // null 表示取数异常，跳过评论区检查
+      let commentText: string | null = null
+      if ((applicableRules.length > 0 || config.aiEnabled) && result.serTaskId) {
         try {
           const activities = await checkComments(result.serTaskId, config.cookie)
-          commentMatches = matchTextRules(extractCommentText(activities), applicableRules, commentMatchMode)
+          commentText = extractCommentText(activities)
         } catch {
-          // 评论区检查异常不影响校验主流程
-          commentMatches = null
+          commentText = null
         }
+      }
+      if (commentText !== null && applicableRules.length > 0) {
+        commentMatches = matchTextRules(commentText, applicableRules, commentMatchMode)
       }
 
       // AI 审查：仅启用时执行，异常只记录不中断校验主流程
@@ -148,7 +173,7 @@ export async function validateBatch(
       let aiError: string | undefined
       if (config.aiEnabled && result.serTaskId) {
         try {
-          aiConclusion = (await aiReviewTask(result.serTaskId, config.cookie)).conclusion
+          aiConclusion = await runAiReview(result, commentText)
         } catch (e: any) {
           aiError = e?.message || 'AI 审查失败'
         }

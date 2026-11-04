@@ -9,7 +9,6 @@
 
 // #region 通知相关
 
-// 通知元素（未读通知列表）
 export interface NotificationElement {
   _type: string
   id: number
@@ -40,7 +39,6 @@ export interface NotificationElement {
   _projectName: string
 }
 
-// 通知列表 API 响应
 export interface NotificationsResponse {
   _type: string
   total: number
@@ -55,9 +53,8 @@ export interface NotificationsResponse {
 
 // #endregion
 
-// #region 活动/评论相关
+// #region 活动与评论相关
 
-// 活动/评论元素
 export interface ActivityElement {
   _type: string
   id: number
@@ -77,7 +74,6 @@ export interface ActivityElement {
   _links: Record<string, any>
 }
 
-// 任务评论区 API 响应
 export interface ActivitiesResponse {
   _type: string
   total: number

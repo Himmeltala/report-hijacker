@@ -11,9 +11,6 @@ import { normalizeApiBaseUrl } from '@/utils/apiUrl'
 
 // #region 类型定义
 
-/**
- * API 客户端接口，供各服务依赖注入时使用
- */
 export interface ApiClient {
   get<T = any>(path: string, cookie: string): Promise<T>
   post<T = any>(path: string, cookie: string, body?: any): Promise<T>
@@ -33,12 +30,12 @@ const REQUEST_TIMEOUT = 15000
 /**
  * 创建 OpenProject API 客户端
  * 每次请求读取 baseUrl（不缓存），避免档案或设置切换后请求打到旧地址
- * @param {() => string} getBaseUrl 获取 API 基础地址的回调（读取设置）
+ * @param {() => string} getBaseUrl 获取 API 基础地址的回调
  * @returns {ApiClient} API 客户端对象
  */
 export function createApiClient(getBaseUrl: () => string): ApiClient {
   const resolveBaseUrl = (): string => {
-    // 规范化后保留子路径（如 /openproject），请求路径以 /api/v3 开头拼在其后
+    // 规范化后保留子路径
     return normalizeApiBaseUrl(getBaseUrl())
   }
 
@@ -47,7 +44,6 @@ export function createApiClient(getBaseUrl: () => string): ApiClient {
      * 发送 GET 请求
      * @param {string} path 请求路径（含 /api/v3 前缀）
      * @param {string} cookie 登录 Cookie
-     * @returns {Promise<T>} 响应 JSON
      */
     async get<T = any>(path: string, cookie: string): Promise<T> {
       const res = await fetch(`${resolveBaseUrl()}${path}`, {
@@ -63,10 +59,10 @@ export function createApiClient(getBaseUrl: () => string): ApiClient {
     },
 
     /**
-     * 发送 POST 请求，空 body 时返回 null 语义
+     * 发送 POST 请求
      * @param {string} path 请求路径
      * @param {string} cookie 登录 Cookie
-     * @param {any} body 请求体，可选
+     * @param {any} body 请求体
      * @returns {Promise<T>} 响应 JSON 或成功状态
      */
     async post<T = any>(path: string, cookie: string, body?: any): Promise<T> {

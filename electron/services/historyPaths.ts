@@ -14,7 +14,6 @@ import { basename, join } from 'path'
 /** 历史日期文件名的合法格式（防止路径注入） */
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
-/** 年目录名格式 */
 const YEAR_DIR_PATTERN = /^\d{4}$/
 
 /** 月目录名格式，月份补零，保证按字符串排序与真实月份一致 */
@@ -28,7 +27,7 @@ export function assertValidDate(date: string): void {
   if (!DATE_PATTERN.test(date)) {
     throw new Error(`非法日期格式: ${date}`)
   }
-  // 校验日历合法性（如 2026-99-99、2026-02-30），防止写入无法归类的日期文件
+  // 校验日历合法性，防止写入无法归类的日期文件
   const [year, month, day] = date.split('-').map(Number)
   const parsed = new Date(year, month - 1, day)
   if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
@@ -40,7 +39,6 @@ export function assertValidDate(date: string): void {
  * 由日期算出历史文件路径：history/YYYY/MM/YYYY-MM-DD.json
  * @param {string} historyDir 历史目录
  * @param {string} date 日期字符串（YYYY-MM-DD）
- * @returns {string} 历史文件完整路径
  */
 export function historyFilePath(historyDir: string, date: string): string {
   return join(historyDir, date.slice(0, 4), date.slice(5, 7), `${date}.json`)
@@ -49,7 +47,6 @@ export function historyFilePath(historyDir: string, date: string): string {
 /**
  * 列出目录项，目录不存在或读不动时返回空数组
  * @param {string} dir 目标目录
- * @returns {Dirent[]} 目录项列表
  */
 function readDirSafe(dir: string): Dirent[] {
   try {
@@ -62,7 +59,6 @@ function readDirSafe(dir: string): Dirent[] {
 /**
  * 判断日期是否合法（格式与日历都合法）
  * @param {string} date 日期字符串
- * @returns {boolean} 是否合法
  */
 function isValidDate(date: string): boolean {
   try {
@@ -75,9 +71,7 @@ function isValidDate(date: string): boolean {
 
 /**
  * 列出历史目录下的日期
- *
- * 只认 年/月 两级目录，且文件名的年月必须与所在目录一致，避免把误放进来的其他文件当成历史数据。
- * 传入范围时只读取与范围相交的年、月目录，范围外的目录不遍历。
+ * 只认文件名年月与目录一致的 年/月 两级目录，避免把误放进来的文件当成历史数据；传入范围时只读取相交的年月目录
  * @param {string} historyDir 历史目录
  * @param {{ startDate?: string; endDate?: string }} [range] 日期范围（YYYY-MM-DD，闭区间）
  * @returns {string[]} 日期列表（YYYY-MM-DD）
@@ -155,12 +149,8 @@ export interface RestorePick {
 
 /**
  * 判断相对路径是否正好落在该日期的 年/月 子目录下
- *
- * 层级分隔符用 join 生成，保证与 listJsonFilesRecursive 返回的路径在同一个平台上写法一致。
- *
  * @param {string} relPath 相对源目录的路径
  * @param {string} date 日期字符串（YYYY-MM-DD）
- * @returns {boolean} 是否为分层布局
  */
 function isLayeredPath(relPath: string, date: string): boolean {
   return relPath === join(date.slice(0, 4), date.slice(5, 7), `${date}.json`)
@@ -168,12 +158,9 @@ function isLayeredPath(relPath: string, date: string): boolean {
 
 /**
  * 比较两份候选文件，返回正数表示 a 更优先
- *
- * 先比修改时间取新的，时间相同时优先分层布局，最后退回路径字典序，保证结果不随目录读取顺序变化。
- *
+ * 保证结果不随目录读取顺序变化
  * @param {RestoreCandidate} a 候选文件甲
  * @param {RestoreCandidate} b 候选文件乙
- * @returns {number} 比较结果
  */
 function compareCandidates(a: RestoreCandidate, b: RestoreCandidate): number {
   if (a.mtimeMs !== b.mtimeMs) return a.mtimeMs - b.mtimeMs
@@ -183,13 +170,9 @@ function compareCandidates(a: RestoreCandidate, b: RestoreCandidate): number {
 
 /**
  * 从源目录的文件列表中为每个日期挑出唯一来源
- *
- * 备份目录可能同时留着平铺的旧文件和迁移后的年/月分层文件，同一个日期会扫到两份，
- * 若不挑拣，写回顺序由目录读取顺序决定，恢复结果不稳定。这里每个日期只留一份最新文件。
- *
+ * 备份目录可能同一日期同时存在平铺与分层两份文件，不挑拣则恢复结果不稳定
  * @param {string} srcDir 源目录
  * @param {string[]} relPaths 相对源目录的 .json 文件路径列表
- * @returns {RestorePick} 每个日期的唯一来源与冲突日期个数
  */
 export function pickRestoreSources(srcDir: string, relPaths: string[]): RestorePick {
   const best = new Map<string, RestoreCandidate>()

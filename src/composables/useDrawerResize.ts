@@ -16,7 +16,7 @@ import { ipc } from '@/utils/ipc'
 const savedWidthCache = new Map<string, number>()
 
 /**
- * 读取宽度同步缓存，优先内存后 localStorage
+ * 读取宽度同步缓存，优先内存，未命中再查 localStorage
  * @param {string} key 存储键
  * @returns 缓存宽度，无缓存时返回 undefined
  */
@@ -155,7 +155,6 @@ export function useDrawerResize(
 
   // #region 生命周期
 
-  // 抽屉关闭时重置宽度；打开时若配置了持久化键则恢复上次保存的宽度
   watch(visible, async (v) => {
     if (!v) {
       reset()

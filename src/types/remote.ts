@@ -10,8 +10,7 @@
 // #region 工具类型
 
 /**
- * 深度只读工具类型：递归将对象所有属性变为 readonly
- * 编译期强制禁止对原始远程数据的赋值、删除、字段增改
+ * 深度只读工具类型：递归将对象所有属性变为 readonly，编译期禁止写入原始远程数据
  */
 export type DeepReadonly<T> = {
   readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K]
@@ -22,9 +21,8 @@ export type DeepReadonly<T> = {
 // #region 工作包类型
 
 /**
- * OpenProject work_package 原始响应
- * 仅声明本项目消费到的字段；[key: string]: any 兜底未声明字段，
- * 但整体经 DeepReadonly 包裹后所有字段均只读，无法写入
+ * OpenProject work_package 原始响应，仅声明消费到的字段
+ * [key: string]: any 兜底未声明字段，DeepReadonly 包裹后所有字段只读
  */
 export interface RawWorkPackage {
   id: number
@@ -65,8 +63,7 @@ export type ReadonlyRawWorkPackage = DeepReadonly<RawWorkPackage>
 // #region 通知类型
 
 /**
- * OpenProject 通知元素原始响应
- * 平台返回的 notification 元素，仅声明消费到的字段
+ * OpenProject 通知元素原始响应，仅声明消费到的字段
  */
 export interface RawNotificationElement {
   _type: string

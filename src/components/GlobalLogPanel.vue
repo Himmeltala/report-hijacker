@@ -97,8 +97,6 @@ function onFilterCommand(key: string) {
   logStore.toggleFilterType(key)
 }
 
-// 拖拽调整大小
-
 let dragState: { startY: number; startH: number } | null = null
 
 function onDragStart(e: MouseEvent) {
@@ -125,8 +123,6 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onDragMove)
   document.removeEventListener('mouseup', onDragEnd)
 })
-
-// 自动滚动
 
 let wrapEl: HTMLElement | null = null
 

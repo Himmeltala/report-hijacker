@@ -88,7 +88,6 @@
         </el-scrollbar>
       </div>
 
-      <!-- 边界校验与评论区检查逐条结果（共用列表组件） -->
       <RuleMatchList
         v-if="result.serBoundaryResults && result.serBoundaryResults.length > 0"
         title="边界校验"
@@ -102,7 +101,6 @@
         :mode="(commentMatchMode as MatchMode) || 'all'"
       />
 
-      <!-- AI 审查结论（启用 AI 审查时有值） -->
       <div v-if="aiConclusion" class="checks-section">
         <div class="checks-title">AI 审查</div>
         <div class="ai-conclusion">{{ aiConclusion }}</div>
@@ -127,7 +125,7 @@ const props = defineProps<{
   aiConclusion?: string | null
 }>()
 
-// 失败项排前，同类项保持原顺序；「任务ID」只作内部标识，不在校验信息里展示
+// 失败项排前；「任务ID」只作内部标识，不在校验信息展示
 const sortedChecks = computed(() => {
   const checks = (props.result?.serChecks || []).filter((c) => c.name !== '任务ID')
   return [...checks].sort((a, b) => Number(a.passed) - Number(b.passed))
@@ -144,7 +142,6 @@ function fmtHours(val: string | number | undefined | null): string {
   return h > 0 ? h + ' h' : String(val)
 }
 
-// 对比方式中文名（与设置页任务校验选项一致）
 function compareLabel(compare: string): string {
   const map: Record<string, string> = {
     equals: '全等',
@@ -162,7 +159,7 @@ function compareLabel(compare: string): string {
   return map[compare] || compare
 }
 
-// 设置值来源的对比字段显示名：设置键映射业务名，未映射的键原样显示
+// 设置值来源的对比字段显示名：设置键映射为业务名
 function configKeyLabel(key?: string): string {
   if (!key) return '-'
   const map: Record<string, string> = {

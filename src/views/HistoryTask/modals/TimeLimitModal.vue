@@ -38,7 +38,7 @@ interface TimeLimitForm {
   timeLimit: 'today' | 'temp' | null
 }
 
-// 弹窗内用 none 表示未设置，确认时再转回 null，便于 radio 绑定
+// 弹窗内用 none 表示未设置，确认时再转回 null，便于绑定 radio
 type TimeLimitOption = 'today' | 'temp' | 'none'
 
 const props = defineProps<{

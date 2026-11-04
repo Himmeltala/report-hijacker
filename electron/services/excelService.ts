@@ -26,7 +26,7 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
   // #region 模板路径
 
-  // 获取内置模板路径（assets/templates/模板.xlsx），结果缓存避免重复 stat
+  // 结果缓存，避免重复 stat
   let cachedTemplatePath: string | null = null
   const getBuiltinTemplatePath = (): string => {
     if (cachedTemplatePath !== null) return cachedTemplatePath
@@ -93,7 +93,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 扫描模板结构
 
-    // 1. 扫描所有单元格，识别任务行和合计行
     const taskTemplateRows: number[] = []
     const summaryRows: number[] = []
     ws.eachRow((row, rowNumber) => {
@@ -112,7 +111,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 获取 API 数据
 
-    // 2. 批量获取 API 数据（并行请求，去重 taskId）
     const apiCache: Record<string, any> = {}
     const uniqueIds = Array.from(new Set(tasks.map((t) => extractWpId(t.rawUrl)).filter(Boolean))) as string[]
     const details = await Promise.all(
@@ -131,7 +129,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 构建任务数据
 
-    // 3. 构建任务数据映射
     function buildTaskData(task: any, index: number): Record<string, string> {
       const taskId = extractWpId(task.rawUrl)
       const detail = taskId ? apiCache[taskId] : null
@@ -169,7 +166,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
       return data
     }
 
-    // 全局变量映射
     const globalData: Record<string, string> = {
       month: String(now.getMonth() + 1),
       year: String(now.getFullYear()),
@@ -180,7 +176,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 占位符替换
 
-    // 4. 替换单元格中的占位符
     function replacePlaceholders(cellValue: string, data: Record<string, string>): string {
       return cellValue.replace(PLACEHOLDER_RE, (_match, key) => {
         const k = key.trim()
@@ -192,12 +187,10 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 处理任务行
 
-    // 5. 处理任务行：复制模板行并填充数据
     if (taskTemplateRows.length > 0 && taskCount > 0) {
       const templateRowCount = taskTemplateRows.length
       const firstTemplateRow = taskTemplateRows[0]
 
-      // 记录模板行的样式和原始值
       const templateRowsData: Array<{ styles: Record<number, any>; values: Record<number, string> }> = []
       for (const rowNum of taskTemplateRows) {
         const row = ws.getRow(rowNum)
@@ -210,13 +203,11 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
         templateRowsData.push({ styles, values })
       }
 
-      // 插入新行（在第一个模板行之前）
       const rowsToInsert = (taskCount - 1) * templateRowCount
       if (rowsToInsert > 0) {
         ws.spliceRows(firstTemplateRow, 0, ...Array.from({ length: rowsToInsert }, () => []))
       }
 
-      // 逐任务填充
       for (let i = 0; i < taskCount; i++) {
         const taskData = buildTaskData(tasks[i], i)
         const mergedData = { ...globalData, ...taskData }
@@ -235,8 +226,7 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
         }
       }
 
-      // 原始模板行已被填充循环覆盖（其位置在 firstTemplateRow + rowsToInsert，即最后一个任务的填充范围），无需删除
-      // 注意：不得再删除此处下方的行，否则会误删模板内容（如合计行）
+      // 原始模板行由填充循环覆盖是有意为之，不要删除它，也不要删除其下方行，否则会误删合计行等模板内容
     } else if (taskCount === 0) {
       // 无任务时删除模板任务行
       for (let r = taskTemplateRows.length - 1; r >= 0; r--) {
@@ -248,14 +238,13 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 清理空白行
 
-    // 6. 清理任务数据行与合计行之间的空白预留行，避免导出文件出现大量空白行
+    // 清理任务数据行与合计行之间的空白预留行，避免导出文件出现大量空白行
     if (taskCount > 0 && summaryRows.length > 0 && taskTemplateRows.length > 0) {
       const templateRowCount = taskTemplateRows.length
       const firstTemplateRow = taskTemplateRows[0]
-      // 填充后合计行的新位置（任务区插入的行使合计行整体下移）
+      // 合计行已随任务区插入下移
       const firstSummaryRow = summaryRows[0] + (taskCount - 1) * templateRowCount
       const lastDataRow = firstTemplateRow + taskCount * templateRowCount - 1
-      // 从合计行上方倒序删除空白行，保留数据行与合计行
       for (let r = firstSummaryRow - 1; r > lastDataRow; r--) {
         const row = ws.getRow(r)
         let hasValue = false
@@ -271,7 +260,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 计算合计
 
-    // 7. 计算合计值
     const numericFields = ['score', 'estimatedHours', 'customField1', 'customField105', 'customField107']
     const summaryData: Record<string, string> = { 'summary.count': String(taskCount) }
     for (const field of numericFields) {
@@ -281,7 +269,7 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
         if (field === 'score') {
           val = parseFloat(task.rawScore)
         } else if (field === 'estimatedHours') {
-          // 与任务行 estimatedHours 列口径一致：使用本地解析的自评预估工时
+          // 合计的 estimatedHours 用本地自评预估工时，与任务行一致
           val = parseFloat(task.rawEstimatedHours)
         } else {
           const taskId = extractWpId(task.rawUrl) || ''
@@ -296,7 +284,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     // #region 替换合计占位符
 
-    // 8. 替换所有单元格中的全局和合计占位符
     ws.eachRow((row) => {
       row.eachCell((cell) => {
         const val = String(cell.value || '')

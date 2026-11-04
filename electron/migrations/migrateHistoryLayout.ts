@@ -25,11 +25,7 @@ export interface MigrationResult {
 }
 
 /**
- * 把历史目录下平铺的 YYYY-MM-DD.json 搬进 YYYY/MM/ 子目录
- *
- * 只处理历史目录顶层的日期文件，年份或月份命名的子目录一概不碰，所以重复执行不会破坏已分层的数据。
- * 迁移结果以文件数计，单个文件搬迁失败只记数并保留原文件，不影响其余文件。
- *
+ * 把历史目录下平铺的 YYYY-MM-DD.json 搬进 YYYY/MM/ 子目录，只处理顶层日期文件，重复执行不会破坏已分层数据
  * @param {string} historyDir 历史目录
  * @returns {MigrationResult} 迁移统计
  */

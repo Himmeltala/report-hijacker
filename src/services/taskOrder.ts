@@ -19,7 +19,6 @@ export const TYPE_ORDER = ['缺陷', '任务']
 
 // #region 比较器
 
-/** 参与排序的字段，取自历史任务条目或工作台通知 */
 export interface TaskOrderFields {
   /** 平台状态名，取不到时排最后 */
   status?: string

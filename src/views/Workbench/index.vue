@@ -9,7 +9,6 @@
 
 <template>
   <div class="page-workbench">
-    <!-- 工具栏 -->
     <div class="page-toolbar">
       <div class="toolbar-actions">
         <div>
@@ -25,7 +24,6 @@
       </div>
     </div>
 
-    <!-- Tab 切换 -->
     <div class="tab-bar">
       <el-tabs type="card" v-model="activeTab" @tab-change="onTabChange">
         <el-tab-pane label="未读通知" name="unread" />
@@ -33,7 +31,6 @@
       </el-tabs>
     </div>
 
-    <!-- 内容区 -->
     <div class="page-content">
       <UnreadNotifications v-show="activeTab === 'unread'" ref="unreadRef" @selection-change="onChildSelectionChange" />
       <AllNotifications v-show="activeTab === 'all'" ref="allRef" @selection-change="onChildSelectionChange" />
@@ -66,9 +63,6 @@ const unreadLoading = computed(() => !!unreadRef.value?.loading)
 const allLoading = computed(() => !!allRef.value?.loading)
 const selectedRows = ref<NotificationElement[]>([])
 
-/**
- * 切换 Tab
- */
 function onTabChange() {
   selectedRows.value = []
   // 切换到全部且未加载时触发加载
@@ -81,9 +75,6 @@ function onTabChange() {
   }
 }
 
-/**
- * 刷新当前 Tab
- */
 function handleRefresh() {
   selectedRows.value = []
   if (activeTab.value === 'unread') {
@@ -98,10 +89,6 @@ const saveModal = useModal({
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
 
-/**
- * 子表勾选变化时同步给工具栏按钮
- * @param {NotificationElement[]} rows 勾选的通知
- */
 function onChildSelectionChange(rows: NotificationElement[]) {
   selectedRows.value = rows
 }
@@ -136,11 +123,6 @@ async function handleAddToHistory() {
   )
 }
 
-/**
- * 把勾选的通知写入历史文件
- * @param {NotificationElement[]} rows 勾选的通知
- * @param {string} date 保存日期
- */
 async function saveNotificationsToHistory(rows: NotificationElement[], date: string) {
   const now = new Date().toISOString()
   const tasks: HistoryTaskItem[] = rows.map((n) => ({

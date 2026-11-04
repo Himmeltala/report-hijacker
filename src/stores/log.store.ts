@@ -11,7 +11,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { LogEntry } from '@/types/log'
 
-// 日志面板折叠状态的 localStorage 键名
 const LOG_PANEL_KEY = 'log_panel_collapsed'
 
 export const useLogStore = defineStore('log', () => {
@@ -54,7 +53,6 @@ export const useLogStore = defineStore('log', () => {
 
   function togglePanel() {
     panelVisible.value = !panelVisible.value
-    // 折叠状态持久化，重启应用后保持
     localStorage.setItem(LOG_PANEL_KEY, panelVisible.value ? 'expanded' : 'collapsed')
   }
 
@@ -80,7 +78,7 @@ export const useLogStore = defineStore('log', () => {
     try {
       await window.electron?.setSetting?.(`appearance.${key}`, value)
     } catch {
-      // 忽略
+      // 开发模式或无 IPC
     }
   }
 
@@ -91,7 +89,7 @@ export const useLogStore = defineStore('log', () => {
       const m = await window.electron?.getSetting?.('appearance.logMaxLines')
       if (m) maxLines.value = Number(m) || 500
     } catch {
-      // 忽略
+      // 开发模式或无 IPC
     }
   }
 

@@ -40,16 +40,10 @@ export function setCache<T>(key: string, data: T, ttlMs = 30 * 60 * 1000): void 
   store.set(key, { data, expireAt: Date.now() + ttlMs })
 }
 
-/**
- * 删除指定缓存
- */
 export function removeCache(key: string): void {
   store.delete(key)
 }
 
-/**
- * 清空所有缓存
- */
 export function clearAllCache(): void {
   store.clear()
 }

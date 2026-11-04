@@ -32,13 +32,12 @@ async function bootstrap() {
   const settingsStore = useSettingsStore(pinia)
   await settingsStore.loadConfig()
 
-  // 保存原生 console.warn 引用，避免后续 App.vue 覆盖层 JSON.stringify 循环引用对象
+  // 保存原生 console.warn，避免后续 JSON.stringify 层对循环引用对象崩溃
   const nativeWarn = console.warn
   app.config.warnHandler = (msg, _instance, trace) => {
     nativeWarn(`[Vue warn] ${msg}${trace ? `\n${trace}` : ''}`)
   }
 
-  // Vue 运行时错误捕获
   app.config.errorHandler = (err, _instance, info) => {
     const logStore = useLogStore(pinia)
     const msg = err instanceof Error ? err.message : String(err)

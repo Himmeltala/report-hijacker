@@ -9,7 +9,6 @@
 
 // #region 规则类型
 
-// 匹配规则（评论区检查 / 边界校验共用）
 export interface CommentRule {
   enabled: boolean
   label: string
@@ -19,17 +18,14 @@ export interface CommentRule {
   types?: string[]
 }
 
-// 规则匹配模式
 export type MatchMode = 'all' | 'any'
 
 // 校验规则：平台字段 与 预期来源 的比对描述（配置化校验，不写死）
 export interface CheckRule {
   enabled: boolean
-  /** 检查名（弹窗展示，如「任务状态」「所属部门」） */
+  /** 检查名，弹窗展示 */
   label: string
-  /** 平台字段路径，如 subject / _embedded.status.name / _embedded.project.name /
-      _embedded.responsible.name / estimatedTime / customField105 / customField106 /
-      startDate / dueDate / description.raw */
+  /** 平台字段路径，如 subject、_embedded.status.name、estimatedTime、customField105、description.raw */
   field: string
   /** 预期来源：text 文本任务字段；config 设置配置值；none 无预期（只查平台字段，归 remote 自检段） */
   expected: 'text' | 'config' | 'none'
@@ -38,27 +34,27 @@ export interface CheckRule {
   /** 比对方式 */
   compare:
     | 'equals' // 全等：field 值与预期值相同
-    | 'gt' // 大于：field 数值 > 预期数值
+    | 'gt' // 大于：field 数值大于预期数值
     | 'gte' // 大于等于：field 数值大于或等于预期数值
-    | 'lt' // 小于：field 数值 < 预期数值
+    | 'lt' // 小于：field 数值小于预期数值
     | 'lte' // 小于等于：field 数值小于或等于预期数值
     | 'diff-hours' // 偏差：field 值(小时)与预期(小时)差值不超过容差
     | 'field-diff' // 平台内部两字段偏差：field 与 compareField 差值不超过容差
     | 'non-empty' // 非空：平台字段有值（发现漏填）
-    | 'list-any' // 白名单：field 值 ∈ values
+    | 'list-any' // 白名单：field 值在 values 之中
     | 'regex-any' // 多条件或：rules 任一匹配
     | 'regex-all' // 多条件且：rules 全部匹配
-  /** diff-hours / field-diff 容差（小时），默认 3 */
+  /** diff-hours 与 field-diff 的容差（小时），默认 3 */
   tolerance?: number
   /** field-diff 的第二个平台字段路径 */
   compareField?: string
-  /** list-any 白名单（如任务状态：['待检查','已实现']） */
+  /** list-any 白名单 */
   values?: string[]
-  /** regex-any / regex-all 的多条件规则（复用 CommentRule 结构，如所属部门、任务状态多条件） */
+  /** regex-any 与 regex-all 的多条件规则，复用 CommentRule 结构 */
   rules?: CommentRule[]
-  /** 多条件匹配模式（或/且） */
+  /** 多条件匹配模式（且/或） */
   matchMode?: MatchMode
-  /** 跳过类型（如缺陷 defect），沿用现状能力 */
+  /** 跳过类型，如缺陷 defect */
   skipTypes?: string[]
 }
 
@@ -66,7 +62,6 @@ export interface CheckRule {
 
 // #region 应用配置
 
-// 配置
 export interface AppConfig {
   cookie: string
   handlerName: string

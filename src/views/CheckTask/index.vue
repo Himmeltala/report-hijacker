@@ -9,7 +9,6 @@
 
 <template>
   <div class="page-check-task">
-    <!-- 工具栏 -->
     <div class="page-toolbar">
       <div class="toolbar-actions">
         <el-button type="primary" @click="handleParse" :disabled="!rawText.trim()">
@@ -25,10 +24,8 @@
       </div>
     </div>
 
-    <!-- 输入区 -->
     <ParseInput v-model:text="rawText" :unrecognized-lines="unrecognizedLines" />
 
-    <!-- 统计栏 -->
     <div v-if="stats.totalTasks" class="stats-bar">
       <span class="stat-item"
         >任务数 <strong>{{ stats.totalTasks }}</strong></span
@@ -58,7 +55,6 @@
       >
     </div>
 
-    <!-- 任务表格 -->
     <div class="table-area">
       <el-scrollbar>
         <el-table border :data="parsedTasks" stripe style="width: 100%">
@@ -187,8 +183,6 @@
         </el-table>
       </el-scrollbar>
     </div>
-
-    <!-- 校验详情弹窗（由 useModal 管理） -->
   </div>
 </template>
 
@@ -222,7 +216,6 @@ const validationResults = ref<(ValidationResult | null)[]>([])
 const commentCheckResults = ref<(CommentRuleMatch[] | null)[]>([])
 const aiConclusions = ref<(string | null)[]>([])
 
-// 统计栏数据
 const stats = computed(() =>
   computeTaskStats(
     parsedTasks.value,

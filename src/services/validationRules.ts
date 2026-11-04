@@ -13,7 +13,6 @@ import { parseHoursValue } from '@/utils/hours'
 
 // #region 类型定义
 
-// 校验期望参数
 export interface WorkPackageExpectations {
   taskId: string
   rawSeq: string
@@ -28,7 +27,6 @@ export interface WorkPackageExpectations {
   taskDate?: string
 }
 
-// 校验输出（与 ValidationResult 的对应字段同构，避免重复定义）
 export type WorkPackageValidation = Pick<
   ValidationResult,
   'serChecks' | 'serValid' | 'serBoundaryResults' | 'serBoundaryMatchMode'
@@ -38,10 +36,8 @@ export type WorkPackageValidation = Pick<
 
 // #region 常量
 
-// 任务类型常量
 const TYPE_TASK = '任务'
 
-// 预编译的描述段落提取正则（1. 是什么）
 const WHAT_SECTION_RE = /1\.\s*是什么[：:]\s*([\s\S]*?)(?=\d+\.\s*\S+[：:]|\n*$)/
 
 // #endregion
@@ -49,8 +45,8 @@ const WHAT_SECTION_RE = /1\.\s*是什么[：:]\s*([\s\S]*?)(?=\d+\.\s*\S+[：:]|
 // #region 工具函数
 
 /**
- * 将时长字符串转换为小时数（ISO 8601 或纯数字小时，与渲染端 parser 保持一致）
- * @param {string} isoDuration 时长字符串，如 PT6H / P1DT2H / "6"
+ * 将时长字符串转换为小时数，支持 ISO 8601 或纯数字小时
+ * @param {string} isoDuration 时长字符串
  * @returns {number} 小时数
  */
 export function isoToHours(isoDuration: string): number {
@@ -61,7 +57,7 @@ export function isoToHours(isoDuration: string): number {
  * 对文本执行规则匹配（正则或包含），返回逐条匹配结果
  * @param {string} text 待匹配文本
  * @param {Array<Pick<CommentRule, 'label' | 'pattern' | 'isRegex'>>} rules 启用且非空的规则列表
- * @param {MatchMode} mode 匹配模式（all 全部匹配 / any 任一匹配）
+ * @param {MatchMode} mode 匹配模式（all 全部匹配、any 任一匹配）
  * @returns {CommentRuleMatch[]} 每条规则的匹配结果
  */
 export function matchTextRules(
@@ -107,7 +103,7 @@ export function isRulesPassed(matches: CommentRuleMatch[], mode: MatchMode): boo
 /**
  * 提取未匹配规则的标签列表
  * @param {CommentRuleMatch[]} matches 匹配结果列表
- * @returns {string} 逗号分隔的未匹配标签
+ * @returns {string} 顿号分隔的未匹配标签
  */
 export function failedRuleLabels(matches: CommentRuleMatch[]): string {
   return matches
@@ -133,7 +129,7 @@ function extractSection(descriptionRaw: string, sectionRe: RegExp): string {
 /**
  * 按点分路径从工作包详情取值，自定义字段兼容 _links 下的 title 兜底
  * @param {any} detail OpenProject 工作包 API 响应
- * @param {string} fieldPath 字段路径，如 _embedded.status.name
+ * @param {string} fieldPath 字段路径
  * @returns {string} 字段值，取不到返回空字符串
  */
 function getRemoteValue(detail: any, fieldPath: string): string {
@@ -163,7 +159,6 @@ function resolveExpected(rule: CheckRule, exp: WorkPackageExpectations): string 
 }
 
 /**
- * 执行单条校验规则
  * @param {CheckRule} rule 校验规则
  * @param {any} detail 工作包详情
  * @param {WorkPackageExpectations} exp 期望参数
@@ -171,7 +166,7 @@ function resolveExpected(rule: CheckRule, exp: WorkPackageExpectations): string 
  */
 function runCheckRule(rule: CheckRule, detail: any, exp: WorkPackageExpectations): ValidationCheck | null {
   const taskType = detail?._embedded?.type?.name || detail?._links?.type?.title || ''
-  // 跳过指定类型（如缺陷不校验部门、预估时长）
+  // 跳过指定类型
   if (rule.skipTypes?.includes(taskType)) return null
 
   const actual = getRemoteValue(detail, rule.field)
@@ -282,7 +277,6 @@ function runCheckRule(rule: CheckRule, detail: any, exp: WorkPackageExpectations
     message,
     expected: expectedLabel,
     actual: actualLabel,
-    // 规则配置信息（与设置页任务校验布局对应）
     field: rule.field,
     expectedSource: rule.expected,
     expectedKey: rule.expectedKey,
@@ -314,7 +308,7 @@ export function validateWorkPackage(detail: any, exp: WorkPackageExpectations): 
     if (!passed) isValid = false
   }
 
-  // 配置化校验规则逐条执行（任务ID/标题/项目/处理人/部门/状态/自评时长/偏差/预估时长等）
+  // 执行配置化的校验规则
   for (const rule of exp.checkRules || []) {
     if (!rule.enabled) continue
     const check = runCheckRule(rule, detail, exp)
@@ -323,7 +317,7 @@ export function validateWorkPackage(detail: any, exp: WorkPackageExpectations): 
     fail(check.passed)
   }
 
-  // 1.是什么 段落检查：边界规则按适用类型筛选，未选类型时沿用改造前行为（仅任务）
+  // 1. 是什么段落检查：边界规则按适用类型筛选，未选类型时仅任务
   const sectionWhat = extractSection(descriptionRaw, WHAT_SECTION_RE)
   const boundaryVal = sectionWhat.match(/边界[：:]\s*(.+)/)?.[1]?.trim() || ''
   const activeBoundaryRules = exp.boundaryRules.filter(
@@ -344,7 +338,6 @@ export function validateWorkPackage(detail: any, exp: WorkPackageExpectations): 
     })
     fail(boundaryOk)
 
-    // 逐条匹配结果供渲染端展示
     boundaryResults = results
     boundaryMatchMode = mode
   }

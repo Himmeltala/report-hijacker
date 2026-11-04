@@ -40,14 +40,14 @@ const HEATMAP_COLORS_DARK = ['#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f9
 
 /**
  * 获取当前主题下的热力图配色序列
- * @returns 按热度由低到高的颜色数组，颜色依次加深
+ * @returns 按热度由低到高的颜色数组
  */
 function getHeatmapColors(): string[] {
   return isDarkTheme() ? HEATMAP_COLORS_DARK : HEATMAP_COLORS_LIGHT
 }
 
 /**
- * 获取抽屉表面颜色，作为热力格间隙颜色与页面主题保持一致
+ * 获取抽屉表面颜色，用作热力格间隙颜色
  * @returns 表面颜色值，取不到 CSS 变量时返回主题对应的兜底色
  */
 function getCellGapColor(): string {
@@ -60,7 +60,6 @@ const loading = ref(false)
 const heatmapData = ref<Array<[string, number]>>([])
 const chartRef = ref<HTMLDivElement | null>(null)
 
-// 当前选中时段的任务总数
 const heatmapTotal = computed(() => heatmapData.value.reduce((sum, item) => sum + item[1], 0))
 
 /**

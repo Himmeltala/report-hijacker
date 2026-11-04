@@ -29,13 +29,11 @@
                 >
                   <label>{{ setting.label }}</label>
                   <div class="setting-control">
-                    <!-- 复选框 -->
                     <el-switch
                       v-if="setting.type === 'checkbox'"
                       v-model="settingValues[setting.key]"
                       @change="onChange(setting.key, $event)"
                     />
-                    <!-- 文本输入 -->
                     <el-input
                       v-else-if="setting.type === 'text'"
                       v-model="settingValues[setting.key]"
@@ -44,7 +42,6 @@
                       :type="setting.key === 'connection.cookie' ? 'textarea' : 'text'"
                       :autosize="setting.key === 'connection.cookie' ? { minRows: 2, maxRows: 4 } : undefined"
                     />
-                    <!-- 多行文本输入 -->
                     <el-input
                       v-else-if="setting.type === 'textarea'"
                       v-model="settingValues[setting.key]"
@@ -53,7 +50,6 @@
                       :autosize="{ minRows: 3, maxRows: 8 }"
                       @blur="onChange(setting.key, settingValues[setting.key])"
                     />
-                    <!-- 下拉选择 -->
                     <el-select
                       v-else-if="setting.type === 'combo'"
                       v-model="settingValues[setting.key]"
@@ -66,7 +62,6 @@
                         :value="opt.value"
                       />
                     </el-select>
-                    <!-- 数字输入 -->
                     <div v-else-if="setting.type === 'spinbox'" class="spinbox-wrap">
                       <el-input-number
                         v-model="settingValues[setting.key]"
@@ -77,13 +72,11 @@
                       />
                       <span v-if="setting.suffix" class="spinbox-suffix">{{ setting.suffix }}</span>
                     </div>
-                    <!-- 正则输入 + 测试 -->
                     <RegexTester
                       v-else-if="setting.type === 'regex'"
                       :regex="settingValues[setting.key] ?? setting.default"
                       @update:regex="onRegexChange(setting.key, $event)"
                     />
-                    <!-- 目录列表 -->
                     <div v-else-if="setting.type === 'directories'" class="dir-list-wrap">
                       <div class="dir-list">
                         <div v-for="(dir, i) in settingValues[setting.key] || []" :key="i" class="dir-item">
@@ -95,7 +88,6 @@
                         <el-icon><Plus /></el-icon> 添加目录
                       </el-button>
                     </div>
-                    <!-- 评论区规则列表 -->
                     <div v-else-if="setting.type === 'comment_rules'" class="rules-list-wrap">
                       <div class="rules-list">
                         <div v-for="(rule, i) in settingValues[setting.key] || []" :key="i" class="rule-item">
@@ -142,7 +134,6 @@
                         <el-icon><Plus /></el-icon> 添加规则
                       </el-button>
                     </div>
-                    <!-- 校验规则列表 -->
                     <div v-else-if="setting.type === 'check_rules'" class="rules-list-wrap">
                       <div class="check-legend">
                         <div class="check-legend-head" @click="legendOpen = !legendOpen">
@@ -418,13 +409,9 @@ const localVisible = ref(false)
 const activeCategory = ref('connection')
 const categories = ref<any[]>([])
 const settingValues = ref<Record<string, any>>({})
-// 校验规则配置字段说明（图例）展开状态
 const legendOpen = ref(false)
 
-/**
- * 文本任务字段选项：从 groupRegex 具名组与 parser 派生字段生成
- * 具名组（seq/projectName 等）与派生字段（标题/处理人由备注组拆分）都纳入
- */
+/** 文本任务字段选项：从 groupRegex 具名组与 parser 派生字段生成，标题与处理人由备注组拆分 */
 const TEXT_FIELD_LABELS: Record<string, string> = {
   rawSeq: '序号',
   rawEstimatedHours: '预估工时',
@@ -443,11 +430,10 @@ const textFieldOptions = computed(() => {
   while ((m = re.exec(regexStr))) {
     if (!names.includes(m[1])) names.push(m[1])
   }
-  // 正则具名组 -> raw* 字段
+  // 正则具名组映射为 raw 前缀字段
   const groupFields = names.map((n) => 'raw' + n.charAt(0).toUpperCase() + n.slice(1))
   // parser 派生字段：标题与处理人由备注组拆分，不是正则直接组
   const available = new Set([...groupFields, 'rawTitle', 'rawHandler'])
-  // 按 TaskItem 字段顺序排列，只保留实际可用的
   const order = [
     'rawSeq',
     'rawEstimatedHours',
@@ -473,10 +459,7 @@ const textFieldOptions = computed(() => {
   }))
 })
 
-/**
- * 设置值来源的可对比配置项：从设置 schema 中筛选标记了 compareCandidate 的设置项
- * 值用完整设置键（如 validation.handlerName），引擎按设置键注入取值
- */
+/** 设置值来源的可对比配置项：从设置 schema 筛选标记了 compareCandidate 的设置项，值用完整设置键 */
 const configFieldOptions = computed(() => {
   const options: Array<{ label: string; value: string }> = []
   for (const cat of categories.value) {
@@ -492,9 +475,8 @@ const configFieldOptions = computed(() => {
 })
 
 /**
- * 按对比来源返回适用的对比方式选项
- * 自检（none）模式下排除依赖外部预期值的 equals 和 diff-hours
- * @param {string} expected 对比来源：text / config / none
+ * 按对比来源返回适用的对比方式选项，自检（none）模式排除依赖外部预期值的 equals 与 diff-hours
+ * @param {string} expected 对比来源：text、config、none
  * @returns {Array<{label: string, value: string}>} 适用选项列表
  */
 function getCompareOptions(expected: string): Array<{ label: string; value: string }> {
@@ -512,7 +494,7 @@ function getCompareOptions(expected: string): Array<{ label: string; value: stri
     { label: '多条件且', value: 'regex-all' },
   ]
   if (expected === 'none') {
-    // 自检无外部预期值：排除 equals/diff-hours（必须依赖外部值），保留数值比较（阈值来自 expectedKey 字面值）
+    // 自检无外部预期值：排除依赖外部值的 equals 与 diff-hours，数值比较的阈值取自 expectedKey
     return all.filter((o) => !['equals', 'diff-hours'].includes(o.value))
   }
   return all
@@ -543,7 +525,6 @@ async function loadSchema() {
     if (schema && schema.length > 0) {
       categories.value = schema
     }
-    // 收集所有设置键并并行加载
     const allSettings: Array<{ key: string; default: any }> = []
     for (const cat of categories.value) {
       for (const group of cat.groups) {
@@ -570,8 +551,7 @@ async function loadSchema() {
 }
 
 /**
- * 正则设置变更：校验合法性后回写本地值再持久化
- * 非法正则拒绝保存并提示，避免坏值落盘导致解析功能全部失效
+ * 正则设置变更：校验合法后回写并持久化，非法正则拒绝保存，避免坏值落盘后解析全部失效
  * @param {string} key 设置键名
  * @param {string} value 正则表达式
  */
@@ -610,10 +590,7 @@ async function onChange(key: string, value: any) {
   }
 }
 
-/**
- * 将日志面板相关设置同步到日志 store，使其即时生效
- * 设置导入或重置后同样需要同步，避免面板行数与高度停留在旧值
- */
+/** 将日志面板设置同步到日志 store 即时生效，导入或重置后同样需要同步，避免行数与高度停留旧值 */
 function syncLogStoreSettings() {
   const maxLines = settingValues.value['appearance.logMaxLines']
   if (maxLines !== undefined && maxLines !== null) {
@@ -663,7 +640,6 @@ function removeRule(key: string, index: number) {
 
 async function onRulesChange(key: string) {
   const rules = settingValues.value[key] || []
-  // 校验启用中的正则规则，非法时阻止保存并提示
   for (const rule of rules) {
     if (rule.enabled && rule.isRegex && rule.pattern) {
       try {
@@ -701,7 +677,7 @@ function removeCheckRule(key: string, index: number) {
 async function onCheckRulesChange(key: string) {
   const rules = settingValues.value[key] || []
   for (const rule of rules) {
-    // 自检模式下清理由预期值驱动的对比方式（equals/diff-hours 依赖外部值，数值比较用 expectedKey 阈值不受影响）
+    // 自检模式清理依赖外部预期值的 equals 与 diff-hours，数值比较用 expectedKey 阈值，不受影响
     if (rule.expected === 'none' && ['equals', 'diff-hours'].includes(rule.compare)) {
       rule.compare = 'non-empty'
     }
@@ -746,7 +722,6 @@ async function handleImport() {
     if (ret?.success) {
       logStore.addLog('success', '设置已导入，部分设置可能需要重启后生效')
       await loadSchema()
-      // 导入后同步日志面板设置，无需重启即可生效
       syncLogStoreSettings()
     }
   } catch {
@@ -765,7 +740,6 @@ async function handleReset() {
     return
   }
 
-  // 收集所有需要重置的设置
   const resetEntries: Array<{ key: string; def: any; configKey?: string }> = []
   for (const cat of categories.value) {
     for (const group of cat.groups) {
@@ -780,15 +754,12 @@ async function handleReset() {
       }
     }
   }
-  // 并行写入所有设置
   await Promise.all(resetEntries.map((e) => window.electron?.setSetting?.(e.key, e.def)))
-  // 同步到 store
   for (const e of resetEntries) {
     if (e.configKey && e.def !== undefined && e.def !== null) {
       ;(store.config as any)[e.configKey] = e.def
     }
   }
-  // 重置后同步日志面板设置
   syncLogStoreSettings()
   logStore.addLog('success', '已重置为默认值')
 }

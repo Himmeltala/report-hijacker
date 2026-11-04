@@ -71,7 +71,6 @@ const router = createRouter({
 
 // #region 上次激活菜单
 
-// 上次激活菜单的存储键名
 const LAST_MENU_STORAGE_KEY = 'lastActiveMenu'
 
 // 左侧菜单路径，用于校验上次记录是否仍然有效
@@ -82,7 +81,6 @@ let menuRestored = false
 
 /**
  * 读取上次激活的菜单路径
- *
  * 记录已失效（菜单调整、数据损坏）或 preload 未就绪时回退默认菜单
  *
  * @returns 可用的菜单路径
@@ -98,7 +96,6 @@ async function loadLastMenuPath(): Promise<string> {
 
 /**
  * 应用启动进入根路径时改跳上次激活的菜单
- *
  * 地址栏已带菜单 hash（应用内刷新）时不拦截，按当前地址打开
  */
 router.beforeEach(async (to) => {

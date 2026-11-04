@@ -16,16 +16,7 @@ import { useLogStore } from '@/stores/log.store'
 
 // #region 键名映射
 
-/**
- * AppConfig 属性名 到 持久化键名 映射表
- *
- * 约定：每个设置项的键名由 所属store分类.设置名 组成。
- * 此映射确保前端代码使用简短、自描述的属性名（如 cookie），
- * 而 Electron 持久化使用带分类前缀的键名（如 connection.cookie），
- * 使 settings.json 结构与 settings_schema.json 的分类层级一致。
- *
- * 添加设置项时须在此添加映射，并同步更新 CONFIG_KEYS（SettingsDialog）。
- */
+/** AppConfig 属性名到持久化键名的映射表；键名由 store 分类.设置名 组成，使 settings.json 与 settings_schema.json 的分类层级一致 */
 export const SETTING_KEY_MAP: Record<keyof AppConfig, string> = {
   cookie: 'connection.cookie',
   handlerName: 'validation.handlerName',

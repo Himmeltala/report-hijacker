@@ -123,7 +123,7 @@ async function getCacheKey(): Promise<string> {
 }
 
 const notifications = ref<NotificationElement[]>([])
-// 工作包 ID 该工作包下所有未读通知 ID（含被去重隐藏的重复项），用于单条已读时整组标记
+// 工作包 ID 对应其下所有未读通知 ID（含被去重隐藏的重复项），单条标记已读时用于整组标记
 const wpNotificationIds = ref<Map<number, number[]>>(new Map())
 const currentPage = ref(1)
 const pageSize = ref(15)
@@ -166,9 +166,6 @@ function onSelectionChange(rows: NotificationElement[]) {
   emit('selection-change', rows)
 }
 
-/**
- * 获取选中行数据
- */
 function getSelectedRows(): NotificationElement[] {
   return [...selectedRows.value]
 }
@@ -188,7 +185,7 @@ function clearSelection() {
 async function loadData(forceRefresh = false) {
   const cookie = store.config.cookie
   if (!cookie) return
-  // 已读操作进行中不加载，避免进行中的响应回填已被标记已读的陈旧条目
+  // 已读操作进行中不加载，避免旧响应回填已标记已读的条目
   if (mutating) return
 
   const cacheKey = await getCacheKey()
@@ -205,7 +202,7 @@ async function loadData(forceRefresh = false) {
   loading.value = true
   try {
     // 分页拉取全部未读通知，避免超过单页上限导致未读无法清空
-    // offset 为页号（从 1 起），逐页递增；页数上限兜底服务端异常恒返回满页的无限循环
+    // offset 是页号，从 1 起逐页递增；页数上限防止服务端异常时一直返回满页导致死循环
     const all: NotificationElement[] = []
     let offset = 1
     const PAGE_SIZE = 100
@@ -226,7 +223,7 @@ async function loadData(forceRefresh = false) {
         break
       }
     }
-    // 构建工作包 通知 id 映射（无工作包的通知无法整组标记，跳过）
+    // 构建工作包 ID 到通知 ID 列表的映射（无工作包的通知无法整组标记，跳过）
     const wpIdMap = new Map<number, number[]>()
     for (const el of all) {
       const wpId = el._workPackageId
@@ -260,9 +257,6 @@ async function loadData(forceRefresh = false) {
   }
 }
 
-/**
- * 标记单条已读
- */
 async function markAsRead(row: NotificationElement) {
   const cookie = store.config.cookie
   if (!cookie || readingId.value || mutating) return
@@ -305,7 +299,6 @@ watch(notifications, () => {
   }
 })
 
-// 暴露方法给父组件
 defineExpose({
   loadData,
   getSelectedRows,

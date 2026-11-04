@@ -83,29 +83,20 @@
 </template>
 
 <script lang="ts">
-// 工具栏状态，由父组件持有，仅用于驱动按钮可用状态与提示标签
 export interface ToolbarState {
-  /** 已勾选任务数 */
   selectedCount: number
-  /** 当前页任务数，复制无勾选时使用 */
   pageCount: number
-  /** 当前范围内任务数，同步、检查、导出范围内使用 */
   rangeCount: number
-  /** 全部任务数，删除范围内使用 */
   totalCount: number
-  /** 同步中，同步与同步后接检查期间为真 */
+  /** 同步中；同步后接检查期间也为真 */
   syncing: boolean
-  /** 检查中，检查与同步后接检查期间为真 */
+  /** 检查中；同步后接检查期间也为真 */
   checking: boolean
-  /** 导出中 */
   exporting: boolean
-  /** 备份中 */
   backingUp: boolean
-  /** 是否开启自动同步 */
   autoSyncEnabled: boolean
   /** 上次同步时间展示文本 */
   lastSyncTime: string
-  /** 是否开启自动备份 */
   backupEnabled: boolean
   /** 上次备份时间展示文本 */
   lastBackupTime: string

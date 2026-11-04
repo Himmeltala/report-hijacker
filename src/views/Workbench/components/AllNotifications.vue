@@ -133,15 +133,12 @@ function onSelectionChange(rows: NotificationElement[]) {
   emit('selection-change', rows)
 }
 
-/**
- * 获取选中行数据
- */
 function getSelectedRows(): NotificationElement[] {
   return [...selectedRows.value]
 }
 
 function onPageSizeChange() {
-  // 当前页归一时由 current-change 事件统一触发加载，避免重复请求
+  // 页码重置为 1 时由 current-change 事件统一触发加载，避免重复请求
   if (currentPage.value !== 1) {
     currentPage.value = 1
   } else {

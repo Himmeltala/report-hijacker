@@ -25,10 +25,7 @@ const MARK_READ_CONCURRENCY = 5
 // #region 已读标记
 
 /**
- * 逐条标记已读
- *
- * 集合接口 POST /api/v3/notifications/read_ian 在这套部署上不可用：传 filters 数组报 500，
- * 改传 ids 会把账号下全部未读置为已读，不认传入的 id。定向标记只能走单条接口。
+ * 逐条标记已读：这套部署的集合接口 read_ian 不可用，定向标记只能走单条
  * @param {ApiClient} api API 客户端
  * @param {number} id 通知 ID
  * @param {string} cookie 登录 Cookie
@@ -61,7 +58,7 @@ export function setupNotificationIpc(api: ApiClient): void {
       cookie,
     )
 
-    // 提取工作包 ID（仅局部使用，不写入原始元素）
+    // 提取工作包 ID，不写入原始元素
     const elements = data._embedded?.elements || []
     const wpIdByEl = new Map<NotificationElement, string>()
     const wpIdSet = new Set<string>()
@@ -75,7 +72,7 @@ export function setupNotificationIpc(api: ApiClient): void {
     const wpMap: Record<string, any> = {}
     if (wpIdSet.size > 0) {
       const ids = Array.from(wpIdSet)
-      // 工作池限并发获取详情，避免单页最多 100 个 ID 同时请求触发平台限流
+      // 限并发获取工作包详情，避免触发平台限流
       const details: Array<any | null> = new Array(ids.length)
       let nextIndex = 0
       const worker = async () => {
@@ -90,8 +87,7 @@ export function setupNotificationIpc(api: ApiClient): void {
       }
     }
 
-    // 构建携带业务字段的新元素（浅拷贝原始元素，不修改平台返回的原始数据对象）
-    // 业务字段统一 _ 前缀，与平台字段隔离；原始 elements 保持原封不动
+    // 构建携带业务字段的新元素，_ 前缀与平台字段隔离，不修改原始数据
     const merged = elements.map((el) => {
       const wpId = wpIdByEl.get(el) || ''
       const detail = wpId ? wpMap[wpId] : null
@@ -105,7 +101,7 @@ export function setupNotificationIpc(api: ApiClient): void {
       }
     })
 
-    // 返回时仅替换 elements 数组为合并副本，其余响应字段保持平台原始值
+    // 仅替换 elements 为合并副本，其余字段保持平台原始值
     return {
       ...data,
       _embedded: {

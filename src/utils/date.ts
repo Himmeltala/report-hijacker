@@ -22,9 +22,8 @@ export function formatYMD(d: Date): string {
 }
 
 /**
- * 日期偏移指定天数
  * @param {Date} d 基准日期
- * @param {number} n 偏移天数，负数为往前
+ * @param {number} n 偏移天数，负数表示往前
  * @returns {Date} 偏移后的新日期对象
  */
 export function addDays(d: Date, n: number): Date {

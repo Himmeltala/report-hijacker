@@ -40,7 +40,7 @@ function getElCssVar(varName: string): string {
 
 /**
  * 获取当前主题下 ECharts 图表的文字颜色配置
- * @returns 包含 primary / regular / secondary 三级文字颜色的对象
+ * @returns 包含 primary、regular、secondary 三级文字颜色的对象
  */
 function getThemeTextColors() {
   return {
@@ -58,7 +58,7 @@ function getThemeTextColors() {
  * 简易防抖函数，返回带取消能力的防抖包装
  * @param {Function} fn 需要防抖的函数
  * @param {number} delay 防抖延迟毫秒数
- * @returns {Function & { cancel: Function }} 防抖包装函数，附带 cancel 取消方法
+ * @returns {Function & { cancel: Function }} 防抖包装函数，附带 cancel 方法
  */
 function debounce<T extends (...args: any[]) => any>(fn: T, delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -86,7 +86,7 @@ function debounce<T extends (...args: any[]) => any>(fn: T, delay: number) {
  * @param {number} [options.maxLength] 单屏展示的最大数据条数，超长时轮播，-1 不限制
  * @param {number} [options.delay] 轮播间隔毫秒数
  * @param {boolean} [options.overrideXAxis] 是否用切片结果覆盖生成的 X 轴数据
- * @returns {object} 图表控制方法集合（render/play/stop/dispose 等）
+ * @returns {object} 图表控制方法集合（render、play、stop、dispose 等）
  */
 function useChartRoll({
   chartRef,
@@ -116,7 +116,7 @@ function useChartRoll({
   let chartTheme: string | undefined = getCurrentTheme()
   // 监听根节点主题属性变化，深色与浅色切换时重建图表
   let themeObserver: MutationObserver | null = null
-  // 监听图表容器尺寸变化，抽屉拖拽调整宽度时同步重绘图表
+  // 监听图表容器尺寸变化时重绘图表
   let resizeObserver: ResizeObserver | null = null
   const dataList = ref(null)
 
@@ -155,7 +155,6 @@ function useChartRoll({
     }
   }
 
-  // 立即同步初始值
   {
     const src = dataSource
     syncDataList(isRef(src) ? src.value : src)
@@ -345,7 +344,7 @@ function useChartRoll({
       play()
       bindResizeObserver(chartRef.value)
       window.addEventListener('resize', debounceResize)
-      // 主题切换时销毁旧实例并按新主题重建，组件内的配色在重新生成配置时读取最新主题
+      // 主题切换时销毁旧实例并按新主题重建
       themeObserver = new MutationObserver(() => {
         const nextTheme = getCurrentTheme()
         if (nextTheme === chartTheme) return

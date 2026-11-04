@@ -36,7 +36,7 @@ export function evalTagType(val: string): string {
 
 /**
  * 任务类型到 Tag 颜色类型的映射
- * @param {string} type 任务类型名称（任务/缺陷/其他）
+ * @param {string} type 任务类型名称（任务、缺陷、其他）
  * @returns {string} Element Plus Tag type 值
  */
 export function taskTypeTagType(type: string): string {
@@ -47,7 +47,7 @@ export function taskTypeTagType(type: string): string {
 
 /**
  * 优先级到 Tag 颜色类型的映射（API 英文值）
- * @param {string|null} priority 优先级名称（high/medium/low）
+ * @param {string|null} priority 优先级名称（high、medium、low）
  * @returns {string} Element Plus Tag type 值
  */
 export function priorityTagType(priority: string | null): string {
@@ -59,7 +59,7 @@ export function priorityTagType(priority: string | null): string {
 
 /**
  * 优先级到中文标签的映射
- * @param {string|null} priority 优先级名称（high/medium/low）
+ * @param {string|null} priority 优先级名称（high、medium、low）
  * @returns {string} 中文标签
  */
 export function priorityLabel(priority: string | null): string {
@@ -71,7 +71,7 @@ export function priorityLabel(priority: string | null): string {
 
 /**
  * 限时任务到 Tag 颜色类型的映射
- * @param {string|null} timeLimit 限时类型（today/temp）
+ * @param {string|null} timeLimit 限时类型（today、temp）
  * @returns {string} Element Plus Tag type 值
  */
 export function timeLimitTagType(timeLimit: string | null): string {
@@ -82,7 +82,7 @@ export function timeLimitTagType(timeLimit: string | null): string {
 
 /**
  * 限时任务到中文标签的映射
- * @param {string|null} timeLimit 限时类型（today/temp）
+ * @param {string|null} timeLimit 限时类型（today、temp）
  * @returns {string} 中文标签
  */
 export function timeLimitLabel(timeLimit: string | null): string {
@@ -112,7 +112,6 @@ export function workPackageUrl(id: number, apiBaseUrl: string): string {
 /**
  * 格式化 ISO 时间字符串为可读格式
  * @param {string} iso ISO 8601 时间字符串
- * @returns {string} 格式化后的时间字符串
  */
 export function formatTime(iso: string): string {
   if (!iso) return '-'

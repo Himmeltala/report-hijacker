@@ -40,7 +40,6 @@
 
     <ParseInput v-model:text="rawText" :unrecognized-lines="unrecognizedLines" />
 
-    <!-- 提取结果 -->
     <div class="result-wrapper">
       <el-scrollbar>
         <el-table border :data="extractedTasks" stripe style="width: 100%">
@@ -162,8 +161,6 @@
       :validCount="syncValidCount"
       :invalidCount="syncInvalidCount"
     />
-
-    <!-- 校验详情弹窗（由 useModal 管理） -->
   </div>
 </template>
 
@@ -225,7 +222,7 @@ const totalHours = computed(() => {
   return Math.round(sum * 100) / 100
 })
 
-// 按同步结果统计实际通过/失败数，未同步时均为 0
+// 按同步结果统计实际通过数与失败数，未同步时均为 0
 const syncValidCount = computed(() => syncResults.value.filter((r) => r?.serValid).length)
 const syncInvalidCount = computed(() => syncResults.value.filter((r) => r && !r.serValid).length)
 // #endregion
@@ -281,7 +278,7 @@ function doParse() {
     if (match?.groups) {
       const missing: string[] = []
       for (const g of requiredGroups) {
-        // 具名组必须在正则中定义（值允许为空，如可选的自评工时前缀），与 RegexTester 校验一致
+        // 具名组必须在正则中定义，值允许为空（如可选的自评工时前缀）
         if (!(g in match.groups)) missing.push(g)
       }
       if (missing.length) {
@@ -365,7 +362,6 @@ function handleParse() {
 
 // #region 同步（获取远程字段）
 
-// 校验详情弹窗
 function showDetail(index: number) {
   const result = syncResults.value[index]
   if (result) {
@@ -377,9 +373,6 @@ function showDetail(index: number) {
   }
 }
 
-/**
- * 同步当前提取任务的远程字段（通过批量校验服务完成）
- */
 async function handleSync() {
   const tasks = extractedTasks.value
   if (!tasks.length) return
@@ -571,7 +564,7 @@ async function doSaveHistory(dateStr: string) {
 
 // #region 清空
 function handleClear() {
-  // 取消排队的自动解析，避免清空后 500ms 再次触发一次空解析
+  // 取消排队的自动解析，避免清空后 500 毫秒再触发一次空解析
   autoParse.cancel()
   rawText.value = ''
   unrecognizedLines.value = []

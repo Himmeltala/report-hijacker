@@ -40,7 +40,7 @@
             </template>
           </el-date-picker>
         </div>
-        <!-- 回车与点击搜索按钮等价，都属于主动触发查询 -->
+        <!-- 回车与点击搜索按钮等价，主动触发查询 -->
         <el-input
           v-model="model.keyword"
           class="filter-keyword"
@@ -70,7 +70,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <!-- 条件变更不再自动查询，点击搜索才按当前条件取数 -->
+        <!-- 条件变更不自动查询，点击搜索才取数 -->
         <el-button class="filter-search" type="primary" :icon="Search" :loading="searching" @click="emitSearch">
           搜索
         </el-button>
@@ -78,7 +78,7 @@
       </div>
     </div>
 
-    <!-- 展开区：精细筛选，每个种类一行，条件独占 6 栅格，超出 24 栅格自动换行 -->
+    <!-- 展开区：精细筛选，每类一行，超出 24 栅格自动换行 -->
     <div v-if="model.expanded" class="filter-bar-advanced">
       <div class="filter-group">
         <span class="filter-label">状态</span>
@@ -203,7 +203,6 @@
 </template>
 
 <script lang="ts">
-// 筛选条件状态，由父组件持有，通过 v-model 双向绑定
 export interface FilterState {
   dateRange: [Date, Date]
   keyword: string
@@ -223,10 +222,6 @@ export interface FilterState {
   filterUrl: string
 }
 
-/**
- * 生成筛选条件初始状态
- * @returns {FilterState} 默认筛选条件
- */
 export function createDefaultFilterState(): FilterState {
   const today = new Date()
   return {
@@ -265,7 +260,6 @@ const emit = defineEmits<{
   (e: 'restored'): void
 }>()
 
-// 筛选栏持久化存储键名
 const FILTER_BAR_STORAGE_KEY = 'historyFilterBar'
 
 // 需要持久化的筛选字段，关键字与日期范围属于查询动作，切换页面时重置
@@ -288,7 +282,6 @@ const PERSISTED_KEYS = [
 let filterRestored = false
 const activeQuickLabel = ref('快捷范围')
 
-// 待持久化的筛选状态，展开状态一并记录
 const persistedState = computed(() => {
   const state: Record<string, unknown> = { expanded: model.value.expanded }
   for (const key of PERSISTED_KEYS) state[key] = model.value[key]
@@ -296,8 +289,7 @@ const persistedState = computed(() => {
 })
 
 /**
- * 读取上次保存的筛选条件与展开状态并回显
- * 回显完成后通知父组件同步生效条件，保证列表与筛选栏一致
+ * 读取上次保存的筛选条件与展开状态并回显，保证列表与筛选栏一致
  */
 async function restoreFilterState() {
   const saved = await ipc.storeGet(FILTER_BAR_STORAGE_KEY)
@@ -319,7 +311,7 @@ async function restoreFilterState() {
  */
 function persistFilterState() {
   if (!filterRestored) return
-  // model 为响应式对象，入参由 ipc 统一净化为普通对象后再交给 Electron
+  // model 为响应式对象，ipc 会净化为普通对象再写盘
   ipc.storeSet(FILTER_BAR_STORAGE_KEY, persistedState.value)
 }
 
@@ -331,9 +323,6 @@ function toggleExpanded() {
   model.value.expanded = !model.value.expanded
 }
 
-/**
- * 点击搜索按钮，按当前筛选条件执行查询
- */
 function emitSearch() {
   emit('search')
 }
@@ -353,7 +342,7 @@ function onAddedDateChange() {
 }
 
 /**
- * 从任务列表提取去重后的升序选项
+ * 生成去重升序的非空选项
  * @param {(string | undefined)[]} values 原始值列表
  * @returns {string[]} 去重排序后的非空选项
  */
@@ -366,7 +355,7 @@ const handlerOptions = computed(() => uniqueSorted(props.tasks.map((t) => t.rawH
 const platformStatusOptions = computed(() => uniqueSorted(props.tasks.map((t) => t.remote?._embedded?.status?.name)))
 const platformTypeOptions = computed(() => uniqueSorted(props.tasks.map((t) => t.remote?._embedded?.type?.name)))
 
-// 面板可见月份内存在任务的日期，按可见月份向主进程按需查询
+// 面板可见月份内存在任务的日期
 const dotDates = ref<string[]>([])
 const taskDateSet = computed(() => new Set(dotDates.value))
 // 上一次圆点查询的月份组合，面板打开期间月份不变时不重复查询
@@ -382,8 +371,7 @@ function monthKey(date: Date): string {
 }
 
 /**
- * 查询两个面板可见月份内有任务的日期
- * 月份可能不相邻，逐月查询，避免跨多年时扫描无关月份
+ * 查询可见月份内有任务的日期；月份可能不相邻，逐月查询
  * @param {Date[]} months 面板日期
  */
 async function loadDotDates(months: Date[]) {
@@ -419,14 +407,13 @@ function onPanelVisibleChange(visible: boolean) {
   const right = end ? new Date(end) : new Date()
   // 归到月初再翻月，避免 31 号在短月份溢出到再下一个月
   right.setDate(1)
-  // 起止同月时右面板展示下一个月，与日期面板的默认展开保持一致
+  // 起止同月时右面板展示下一个月（日期面板默认行为）
   if (monthKey(left) === monthKey(right)) right.setMonth(right.getMonth() + 1)
   loadDotDates([left, right])
 }
 
 /**
- * 面板翻月或切换年月后按新的可见月份查询圆点
- * daterange 类型回传 [左面板日期, 右面板日期]
+ * 面板翻月后按新的可见月份查询圆点，daterange 回传左右面板日期
  * @param {Date[]} dates 左右面板当前日期
  */
 function onPanelChange(dates: Date[]) {
@@ -434,18 +421,12 @@ function onPanelChange(dates: Date[]) {
   loadDotDates(dates)
 }
 
-/**
- * 判断指定日期是否有历史任务
- * @param {Date} date 日期对象
- * @returns 有任务时为 true
- */
 function hasTaskOnDate(date: Date): boolean {
   return taskDateSet.value.has(formatYMD(date))
 }
 
 /**
- * 重置常驻区与展开区的全部条件为初始状态，并立即按默认条件搜索一次
- * 展开状态属于界面状态不参与重置
+ * 重置全部筛选条件并立即按默认条件搜索，展开状态属界面状态不参与重置
  */
 function resetFilters() {
   const defaults = createDefaultFilterState()

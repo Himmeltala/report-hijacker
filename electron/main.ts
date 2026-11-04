@@ -19,7 +19,7 @@ import {
   setupProfileIpc,
 } from '@electron/services/profileService'
 import { setupValidationIpc } from '@electron/services/validationService'
-import { setupAiReviewIpc } from '@electron/services/aiReviewService'
+import { setupAiChatIpc } from '@electron/services/aiChatService'
 import { setupNotificationIpc } from '@electron/services/notificationService'
 import { setupSysNotificationIpc } from '@electron/services/sysNotificationService'
 import { setupExcelIpc } from '@electron/services/excelService'
@@ -29,23 +29,21 @@ import { setupHistoryIpc, performBackup } from '@electron/services/historyServic
 const APP_TITLE = '任务管理器'
 let mainWindow: BrowserWindow | null = null
 
-// 档案与设置状态
 let activeProfile = ''
 let schemaPathForReinit = ''
 let settings: AppSettings
 
-// 备份定时器
 let backupTimer: ReturnType<typeof setInterval> | null = null
 
 // #region 数据目录
-/** 获取通用存储目录（基于当前激活档案） */
+/** 获取当前激活档案的存储目录 */
 function getStoreDir(): string {
   const dir = join(getProfileDir(activeProfile), 'store')
   mkdirSync(dir, { recursive: true })
   return dir
 }
 
-/** 获取历史数据目录（基于当前激活档案） */
+/** 获取当前激活档案的历史目录 */
 function getHistoryDir(): string {
   const dir = join(getProfileDir(activeProfile), 'history')
   mkdirSync(dir, { recursive: true })
@@ -57,9 +55,6 @@ function getHistoryDir(): string {
 /** 备份间隔下限（分钟），防止非法配置导致高频备份 */
 const MIN_BACKUP_INTERVAL = 10
 
-/**
- * 根据设置重新配置备份定时器
- */
 function setupBackup(): void {
   if (backupTimer) {
     clearInterval(backupTimer)
@@ -76,7 +71,7 @@ function setupBackup(): void {
   backupTimer = setInterval(
     () => {
       const ok = performBackup(dirs, getHistoryDir, getStoreDir)
-      // 备份成功后通知渲染进程刷新上次备份时间，长时间运行时界面不显示陈旧时间
+      // 备份成功后通知渲染进程刷新上次备份时间
       if (ok > 0) {
         mainWindow?.webContents.send('event:backupCompleted')
       }
@@ -99,7 +94,7 @@ function setupMenu(): void {
       submenu: [
         { label: '设置', click: () => send('settings') },
         { type: 'separator' },
-        // 不带快捷键，Alt+F4 由系统自己处理
+        // 不带快捷键，Alt+F4 由系统处理
         { label: '退出', role: 'quit' },
       ],
     },
@@ -180,10 +175,7 @@ function createWindow(): void {
 // #endregion
 
 // #region 档案激活
-/**
- * 激活指定档案：重建 settings 实例、重启备份定时器、通知渲染进程
- * @param {string} name 档案名称
- */
+/** 激活指定档案：重建 settings 实例、重启备份定时器、通知渲染进程 */
 function activateProfile(name: string): void {
   activeProfile = name
   settings = new AppSettings(getProfileSettingsPath(name), schemaPathForReinit)
@@ -203,7 +195,7 @@ function setupIpcHandlers(): void {
     onBackupSettingChanged: setupBackup,
   })
   setupValidationIpc(api, { getSettings: () => settings })
-  setupAiReviewIpc(api, { getSettings: () => settings })
+  setupAiChatIpc({ getSettings: () => settings })
   setupNotificationIpc(api)
   setupSysNotificationIpc(() => mainWindow)
   setupExcelIpc({ api, mainWindow })
@@ -223,13 +215,11 @@ function setupIpcHandlers(): void {
 // #endregion
 
 // Linux 兼容：禁用 GPU 硬件加速（解决 VMware 虚拟机 GPU 初始化失败问题）
-// 注意：ozone-platform 通过 vite.config.ts 的 onstart 以 CLI 参数传递
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('disable-gpu')
   app.commandLine.appendSwitch('disable-gpu-compositing')
 }
 
-// 单实例锁
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
@@ -245,21 +235,17 @@ if (!gotLock) {
 app
   .whenReady()
   .then(() => {
-    // Windows 系统通知必需：这里必须与 electron-builder.yml 的 appId 一致，
-    // 安装包给开始菜单快捷方式登记的也是这个值，两边不一致通知不会显示
+    // Windows 系统通知要求与 electron-builder.yml 的 appId 一致，不一致则通知不显示
     app.setAppUserModelId('com.zhengrenfu.taskmanager')
 
-    // 初始化档案系统：确定当前激活的用户档案
     activeProfile = initProfileSystem()
 
-    // 解析 schema 路径
     schemaPathForReinit = resolveFirstExisting([
       join(app.getAppPath(), 'assets', 'settings_schema.json'),
       join(app.getAppPath(), '..', 'assets', 'settings_schema.json'),
       join(import.meta.dirname, '..', 'assets', 'settings_schema.json'),
     ])
 
-    // 初始化设置：指向当前档案的 settings.json
     settings = new AppSettings(getProfileSettingsPath(activeProfile), schemaPathForReinit)
 
     setupIpcHandlers()

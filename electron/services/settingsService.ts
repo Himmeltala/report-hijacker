@@ -22,19 +22,13 @@ const COOKIE_MASK = '******'
 // #region AppSettings 类
 
 /**
- * 设置管理类
- * 按 schema 构建默认值，支持点号键名的读写与批量写入
+ * 设置管理类：按 schema 构建默认值，支持点号键名读写与批量写入
  */
 export class AppSettings {
   private path: string
   private schemaPath: string
   private data: Record<string, any> = {}
 
-  /**
-   * 创建设置实例
-   * @param {string} settingsPath 设置文件路径
-   * @param {string} schemaPath 设置 schema 路径
-   */
   constructor(settingsPath: string, schemaPath: string) {
     this.path = settingsPath
     this.schemaPath = schemaPath
@@ -44,7 +38,6 @@ export class AppSettings {
 
   // #region 私有方法
 
-  /** 按 schema 默认值初始化数据 */
   private buildDefaults(): void {
     this.data = {}
     if (!existsSync(this.schemaPath)) return
@@ -77,7 +70,6 @@ export class AppSettings {
     d[parts[parts.length - 1]] = value
   }
 
-  /** 递归合并已持久化的数据到默认值上 */
   private deepMerge(target: any, source: any): void {
     for (const key of Object.keys(source)) {
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
@@ -89,7 +81,6 @@ export class AppSettings {
     }
   }
 
-  /** 从磁盘加载设置文件 */
   private load(): void {
     if (!existsSync(this.path)) {
       this.save()
@@ -107,7 +98,6 @@ export class AppSettings {
 
   // #region 公共方法
 
-  /** 写入磁盘 */
   save(): void {
     mkdirSync(dirname(this.path), { recursive: true })
     writeFileSync(this.path, JSON.stringify(this.data, null, 2), 'utf-8')
@@ -153,12 +143,10 @@ export class AppSettings {
     this.save()
   }
 
-  /** 导出全部数据（供设置导出） */
   exportData(): Record<string, any> {
     return this.data
   }
 
-  /** 获取 schema 路径（供设置读取） */
   getSchemaPath(): string {
     return this.schemaPath
   }
@@ -240,7 +228,7 @@ export function setupSettingsIpc(deps: {
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
     if (filePath.canceled || !filePath.filePath) return { success: false }
-    // 深拷贝后再脱敏，避免掩码值直接写回内存中的当前配置导致后续保存持久化脱敏 Cookie
+    // 深拷贝后脱敏，避免掩码值写回当前配置被持久化
     const data = JSON.parse(JSON.stringify(getSettings().exportData()))
     // 导出时对 Cookie 脱敏，避免设置文件泄露平台账号凭证
     if (data.connection && typeof data.connection === 'object' && data.connection.cookie) {
@@ -272,7 +260,7 @@ export function setupSettingsIpc(deps: {
     if (data.ai && typeof data.ai === 'object' && data.ai.apiKey === COOKIE_MASK) {
       data.ai = { ...data.ai, apiKey: getSettings().get('ai.apiKey', '') }
     }
-    // 仅导入对象类型的顶层设置，跳过原始值与数组，避免损坏的设置结构污染当前配置
+    // 仅导入对象类型的顶层设置，避免损坏结构污染当前配置
     const entries = (Object.entries(data) as Array<[string, any]>).filter(
       ([key, value]) =>
         key !== 'schemaPath' &&

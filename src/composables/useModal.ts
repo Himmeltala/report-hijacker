@@ -20,7 +20,7 @@ interface UseModalOptions {
   emit?: Record<string, (...args: any[]) => void>
   // 触发后自动关闭弹窗的事件名列表
   autoCloseEvents?: string[]
-  // 弹窗关闭回调（外部调 close / 点遮罩 / autoCloseEvents 均触发）
+  // 弹窗关闭回调（外部调 close、点遮罩、autoCloseEvents 均触发）
   onClose?: () => void
 }
 
@@ -34,12 +34,7 @@ interface UseModalReturn {
 // #region useModal 主函数
 
 /**
- * 函数式弹窗
- *
- * 以编程方式打开弹窗组件，支持异步加载、自动销毁、事件驱动关闭。
- * 弹窗实例独立管理，重复调用 open() 会先销毁旧实例再创建新实例。
- * 调用 useModal 所在的组件卸载时自动销毁弹窗，防止 DOM 泄漏。
- *
+ * 函数式弹窗，以编程方式打开，支持异步加载、自动销毁、事件驱动关闭，重复调用先销毁旧实例，宿主组件卸载时自动销毁防 DOM 泄漏
  * @param options.component - 组件定义或异步加载函数
  * @param options.props - 静态 props
  * @param options.emit - 静态事件监听
@@ -76,7 +71,10 @@ export function useModal(options: UseModalOptions): UseModalReturn {
 
   // #region 事件处理
 
-  // 合并静态事件与动态事件，生成组件 props 中的 onXxx 处理器
+  /**
+   * 合并静态事件与动态事件，生成组件 props 中的 onXxx 处理器
+   * @param {object} dynamicEmit 动态事件监听
+   */
   function getEventHandlers(
     dynamicEmit: Record<string, (...args: any[]) => void> = {},
   ): Record<string, (...args: any[]) => void> {
@@ -122,7 +120,9 @@ export function useModal(options: UseModalOptions): UseModalReturn {
 
   // #region 生命周期管理
 
-  // 彻底销毁 DOM 并重置状态
+  /**
+   * 彻底销毁 DOM 并重置状态
+   */
   function destroy() {
     clearTimeout(destroyTimer!)
     destroyTimer = null
@@ -140,7 +140,11 @@ export function useModal(options: UseModalOptions): UseModalReturn {
     loadedComp = null
   }
 
-  // 渲染弹窗到容器
+  /**
+   * 渲染弹窗到容器
+   * @param {boolean} visible 是否可见
+   * @param {object} dynamicEmit 动态事件监听
+   */
   function renderModal(visible: boolean, dynamicEmit: Record<string, (...args: any[]) => void> = {}) {
     if (!container || !loadedComp) return
 
@@ -196,11 +200,9 @@ export function useModal(options: UseModalOptions): UseModalReturn {
     let newEmit: Record<string, (...args: any[]) => void> = {}
 
     if (emitOptions !== undefined) {
-      // open(props, emit)
       newProps = propsOrOptions ?? {}
       newEmit = emitOptions
     } else if (propsOrOptions) {
-      // open(props)
       newProps = propsOrOptions
     }
 
@@ -257,7 +259,6 @@ export function useModal(options: UseModalOptions): UseModalReturn {
 
     loading = false
 
-    // 创建挂载点
     container = document.createElement('div')
     container.id = `modal-${Date.now().toString(36)}`
     document.body.appendChild(container)

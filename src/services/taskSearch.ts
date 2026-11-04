@@ -7,7 +7,6 @@
  * @Description: 任务关键字匹配，主进程查询与渲染端过滤共用同一套口径
  */
 
-/** 参与关键字匹配的任务字段 */
 export interface SearchableTask {
   rawProjectName?: string
   rawTitle?: string
@@ -17,7 +16,6 @@ export interface SearchableTask {
 }
 
 /**
- * 判断任务是否命中关键字
  * @param task 任务
  * @param keyword 关键字，空串表示命中全部
  * @returns 是否命中
