@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:20:00
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 15:20:00
+ * @LastEditTime: 2026-11-04 16:30:00
  * @FilePath: \src\components\MarkdownText.vue
  * @Description: Markdown 渲染组件，用于展示 AI 审查结论
 -->
@@ -28,7 +28,7 @@ const html = computed(() =>
 <style scoped>
 .markdown-text {
   font-size: var(--el-font-size-small);
-  line-height: 1.6;
+  line-height: 1.85;
   word-break: break-word;
 }
 .markdown-text :deep(> :first-child) {
@@ -43,18 +43,21 @@ const html = computed(() =>
 .markdown-text :deep(h4) {
   font-size: 13px;
   font-weight: 600;
-  margin: 8px 0 4px;
+  margin: 12px 0 6px;
 }
 .markdown-text :deep(p) {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
 }
 .markdown-text :deep(ul),
 .markdown-text :deep(ol) {
-  margin: 0 0 6px;
-  padding-left: 18px;
+  margin: 0 0 10px;
+  padding-left: 20px;
 }
 .markdown-text :deep(li) {
-  margin: 2px 0;
+  margin: 3px 0 8px;
+}
+.markdown-text :deep(li:last-child) {
+  margin-bottom: 0;
 }
 .markdown-text :deep(li > p) {
   margin: 0;

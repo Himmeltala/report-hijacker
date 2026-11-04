@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:34:51
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-04 16:30:00
  * @FilePath: \src\modals\TaskDetailModal.vue
  * @Description: 任务详情弹窗，展示平台字段与 AI 审查结论
 -->
@@ -11,7 +11,7 @@
   <el-dialog
     :model-value="visible"
     title="任务详情"
-    width="40vw"
+    width="50vw"
     top="2vh"
     :close-on-click-modal="false"
     @update:model-value="$emit('close')"
@@ -95,7 +95,7 @@ function fmtHours(val: string | number | undefined | null): string {
   margin-bottom: 8px;
 }
 .ai-conclusion {
-  padding: 8px 10px;
+  padding: 10px 14px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: var(--app-radius-sm);

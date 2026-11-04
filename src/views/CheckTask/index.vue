@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:43
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-04 16:30:00
  * @FilePath: \src\views\CheckTask\index.vue
  * @Description: 检查任务页面 - 输入文本解析后执行 AI 审查，展示结论
 -->
@@ -107,7 +107,7 @@
               <span v-else class="text-muted">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="AI 审查" align="center" min-width="180">
+          <el-table-column label="AI 审查" align="center" min-width="320">
             <template #default="{ $index }">
               <MarkdownText v-if="aiConclusions[$index]" :text="aiConclusions[$index]" class="ai-conclusion" />
               <span v-else class="text-muted">-</span>
@@ -364,8 +364,9 @@ function handleClear() {
   flex: 1;
 }
 .ai-conclusion {
-  max-height: 160px;
+  max-height: 280px;
   overflow: auto;
   text-align: left;
+  padding: 2px 4px;
 }
 </style>
