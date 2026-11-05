@@ -10,8 +10,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    // 只自动加载 node 的类型。electron-builder 的依赖树会带进 @types/minimatch 这类空壳包，
-    // 默认行为是把 node_modules/@types 下所有包都当隐式类型库加载，遇到空壳就报 TS2688
     "types": ["node"],
     "jsx": "preserve",
     "strict": true,
