@@ -47,13 +47,13 @@
       >
       <el-divider direction="vertical" />
       <span class="stat-item"
-        >好 <strong>{{ stats.evalGood }}</strong></span
+        >好 <strong>{{ stats.evaluationGood }}</strong></span
       >
       <span class="stat-item"
-        >合格 <strong>{{ stats.evalPass }}</strong></span
+        >合格 <strong>{{ stats.evaluationPass }}</strong></span
       >
       <span class="stat-item"
-        >其他 <strong>{{ stats.evalOther }}</strong></span
+        >其他 <strong>{{ stats.evaluationOther }}</strong></span
       >
       <el-button text class="stats-detail-btn" @click="showStatsDrawer = true">
         较上期 <el-icon><DArrowRight /></el-icon>
@@ -188,7 +188,7 @@
             <template #default="{ row }">
               <el-tag
                 v-if="row.remote?._links?.customField62?.title"
-                :type="evalTagType(row.remote._links.customField62.title)"
+                :type="evaluationTagType(row.remote._links.customField62.title)"
               >
                 {{ row.remote._links.customField62.title }}
               </el-tag>
@@ -290,7 +290,7 @@ import ToolBar, { type ToolbarState } from '@/views/HistoryTask/components/ToolB
 import type { HistoryDay, HistoryTaskItem } from '@/types/ipc'
 import {
   statusTagType,
-  evalTagType,
+  evaluationTagType,
   priorityTagType,
   priorityLabel,
   timeLimitTagType,
@@ -535,9 +535,9 @@ const statsCache = shallowRef<{
     totalSelfHours: number
     totalEstHours: number
     totalScore: number
-    evalGood: number
-    evalPass: number
-    evalOther: number
+    evaluationGood: number
+    evaluationPass: number
+    evaluationOther: number
   }
   detailRows: Array<{
     label: string
@@ -582,27 +582,32 @@ function computeStatsCache() {
         curr: stats.totalEstHours + 'h',
         growth: pct(stats.totalEstHours, prevStats.totalEstHours),
       },
-      { label: '好', prev: prevStats.evalGood, curr: stats.evalGood, growth: pct(stats.evalGood, prevStats.evalGood) },
+      {
+        label: '好',
+        prev: prevStats.evaluationGood,
+        curr: stats.evaluationGood,
+        growth: pct(stats.evaluationGood, prevStats.evaluationGood),
+      },
       {
         label: '合格',
-        prev: prevStats.evalPass,
-        curr: stats.evalPass,
-        growth: pct(stats.evalPass, prevStats.evalPass),
+        prev: prevStats.evaluationPass,
+        curr: stats.evaluationPass,
+        growth: pct(stats.evaluationPass, prevStats.evaluationPass),
       },
       {
         label: '其他',
-        prev: prevStats.evalOther,
-        curr: stats.evalOther,
-        growth: pct(stats.evalOther, prevStats.evalOther),
+        prev: prevStats.evaluationOther,
+        curr: stats.evaluationOther,
+        growth: pct(stats.evaluationOther, prevStats.evaluationOther),
       },
     ],
     chartData: [
       { label: '任务数', prev: prevStats.totalTasks, curr: stats.totalTasks },
       { label: '自评时长', prev: prevStats.totalSelfHours, curr: stats.totalSelfHours },
       { label: '预估时长', prev: prevStats.totalEstHours, curr: stats.totalEstHours },
-      { label: '评价好', prev: prevStats.evalGood, curr: stats.evalGood },
-      { label: '评价合格', prev: prevStats.evalPass, curr: stats.evalPass },
-      { label: '评价其他', prev: prevStats.evalOther, curr: stats.evalOther },
+      { label: '评价好', prev: prevStats.evaluationGood, curr: stats.evaluationGood },
+      { label: '评价合格', prev: prevStats.evaluationPass, curr: stats.evaluationPass },
+      { label: '评价其他', prev: prevStats.evaluationOther, curr: stats.evaluationOther },
     ],
   }
 }
@@ -614,9 +619,9 @@ const stats = computed(
       totalSelfHours: 0,
       totalEstHours: 0,
       totalScore: 0,
-      evalGood: 0,
-      evalPass: 0,
-      evalOther: 0,
+      evaluationGood: 0,
+      evaluationPass: 0,
+      evaluationOther: 0,
     },
 )
 const detailRows = computed(() => statsCache.value?.detailRows || [])

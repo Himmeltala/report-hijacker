@@ -128,7 +128,7 @@ function useChartRoll({
   // #region 数据监听
 
   watch(
-    () => unWrapResponsive(maxLength),
+    () => unwrapResponsive(maxLength),
     () => {
       render()
       play()
@@ -136,7 +136,7 @@ function useChartRoll({
   )
 
   watch(
-    () => unWrapResponsive(chartRef),
+    () => unwrapResponsive(chartRef),
     (el) => {
       if (el) {
         bindResizeObserver(el)
@@ -202,10 +202,10 @@ function useChartRoll({
 
   // #region 辅助函数
 
-  function unWrapResponsive(nv: any) {
-    if (isRef(nv)) return toRaw(nv.value)
-    if (isReactive(nv)) return toRaw(nv)
-    return nv
+  function unwrapResponsive(value: any) {
+    if (isRef(value)) return toRaw(value.value)
+    if (isReactive(value)) return toRaw(value)
+    return value
   }
 
   function isArray(arr: any) {
@@ -214,7 +214,7 @@ function useChartRoll({
 
   function slice() {
     const axisData = xAxis(dataList.value) || []
-    const currentMaxLength = unWrapResponsive(maxLength)
+    const currentMaxLength = unwrapResponsive(maxLength)
     if (!isArray(dataList.value) || dataList.value.length <= currentMaxLength) return axisData
     if (currentMaxLength === -1) return axisData
     return axisData.slice(0, currentMaxLength).filter((i: any) => i !== null && i !== undefined)
@@ -261,7 +261,7 @@ function useChartRoll({
 
   function play() {
     stop()
-    const currentMaxLength = unWrapResponsive(maxLength)
+    const currentMaxLength = unwrapResponsive(maxLength)
     if (currentMaxLength === -1 || !isArray(dataList.value) || dataList.value.length <= currentMaxLength) return
     dataCache = [...dataList.value]
     timer = setInterval(() => {

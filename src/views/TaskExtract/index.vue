@@ -104,7 +104,7 @@
             <template #default="{ $index }">
               <el-tag
                 v-if="syncResults[$index]?.remote?._links?.customField62?.title"
-                :type="evalTagType(syncResults[$index].remote?._links?.customField62?.title)"
+                :type="evaluationTagType(syncResults[$index].remote?._links?.customField62?.title)"
               >
                 {{ syncResults[$index].remote?._links?.customField62?.title }}
               </el-tag>
@@ -177,7 +177,7 @@ import { mergeTasksIntoHistory } from '@/services/historyPersistence'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
 import type { TaskDetailResult } from '@/types/task'
 import type { HistoryTaskItem } from '@/types/ipc'
-import { statusTagType, evalTagType, taskTypeTagType } from '@/utils/tag'
+import { statusTagType, evaluationTagType, taskTypeTagType } from '@/utils/tag'
 import ParseInput from '@/components/ParseInput.vue'
 import StatusBar from '@/views/TaskExtract/components/StatusBar.vue'
 // #endregion

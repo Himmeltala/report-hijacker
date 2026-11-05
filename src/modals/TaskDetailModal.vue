@@ -34,7 +34,7 @@
         <el-descriptions-item label="平台任务评价">
           <el-tag
             v-if="result.remote?._links?.customField62?.title"
-            :type="evalTagType(result.remote?._links?.customField62?.title)"
+            :type="evaluationTagType(result.remote?._links?.customField62?.title)"
           >
             {{ result.remote?._links?.customField62?.title }}
           </el-tag>
@@ -60,7 +60,7 @@
 import type { TaskDetailResult } from '@/types/task'
 import { convertIso8601ToHours } from '@/utils/parser'
 import MarkdownText from '@/components/MarkdownText.vue'
-import { evalTagType } from '@/utils/tag'
+import { evaluationTagType } from '@/utils/tag'
 
 defineProps<{
   visible: boolean

@@ -45,13 +45,13 @@
       >
       <el-divider direction="vertical" />
       <span class="stat-item"
-        >好 <strong>{{ stats.evalGood }}</strong></span
+        >好 <strong>{{ stats.evaluationGood }}</strong></span
       >
       <span class="stat-item"
-        >合格 <strong>{{ stats.evalPass }}</strong></span
+        >合格 <strong>{{ stats.evaluationPass }}</strong></span
       >
       <span class="stat-item"
-        >其他 <strong>{{ stats.evalOther }}</strong></span
+        >其他 <strong>{{ stats.evaluationOther }}</strong></span
       >
     </div>
 
@@ -117,7 +117,7 @@
             <template #default="{ $index }">
               <el-tag
                 v-if="detailResults[$index]?.remote?._links?.customField62?.title"
-                :type="evalTagType(detailResults[$index].remote?._links?.customField62?.title)"
+                :type="evaluationTagType(detailResults[$index].remote?._links?.customField62?.title)"
               >
                 {{ detailResults[$index].remote?._links?.customField62?.title }}
               </el-tag>
@@ -181,7 +181,7 @@ import { parseTaskText, convertIso8601ToHours, formatIso8601Duration } from '@/u
 import { reviewBatch, isAiReviewPassed, type TaskToValidate } from '@/services/taskValidation'
 import { computeTaskStats } from '@/services/taskStats'
 import type { TaskItem, TaskDetailResult } from '@/types/task'
-import { statusTagType, evalTagType, taskTypeTagType } from '@/utils/tag'
+import { statusTagType, evaluationTagType, taskTypeTagType } from '@/utils/tag'
 import ParseInput from '@/components/ParseInput.vue'
 import MarkdownText from '@/components/MarkdownText.vue'
 

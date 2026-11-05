@@ -26,7 +26,7 @@ export function statusTagType(status: string): string {
  * @param {string} val 评价等级
  * @returns {string} Element Plus Tag type 值
  */
-export function evalTagType(val: string): string {
+export function evaluationTagType(val: string): string {
   if (val === '合格') return 'primary'
   if (val === '好') return 'success'
   return 'danger'

@@ -16,9 +16,9 @@ export interface TaskStats {
   totalSelfHours: number
   totalEstHours: number
   totalScore: number
-  evalGood: number
-  evalPass: number
-  evalOther: number
+  evaluationGood: number
+  evaluationPass: number
+  evaluationOther: number
 }
 
 // 远程工作包数据的最小形状：customField 系列平台返回数字，也可能为字符串，字段类型与 RawWorkPackage 兼容
@@ -50,12 +50,12 @@ export function computeTaskStats(
   const totalEstHours = remotes.reduce((s, r) => s + (parseFloat(String(r?.customField105 ?? '')) || 0), 0)
   const totalScore = tasks.reduce((s, t) => s + (parseFloat(t.rawScore || '') || 0), 0)
 
-  const evalTitle = (r: StatsRemote | null | undefined) => r?._links?.customField62?.title || ''
-  const evalGood = remotes.filter((r) => evalTitle(r) === '好').length
-  const evalPass = remotes.filter((r) => evalTitle(r) === '合格').length
+  const evaluationTitle = (r: StatsRemote | null | undefined) => r?._links?.customField62?.title || ''
+  const evaluationGood = remotes.filter((r) => evaluationTitle(r) === '好').length
+  const evaluationPass = remotes.filter((r) => evaluationTitle(r) === '合格').length
   // 其他含未评价任务，保证好、合格、其他三者合计等于任务数
-  const evalOther = remotes.filter((r) => {
-    const title = evalTitle(r)
+  const evaluationOther = remotes.filter((r) => {
+    const title = evaluationTitle(r)
     return title !== '好' && title !== '合格'
   }).length
 
@@ -64,9 +64,9 @@ export function computeTaskStats(
     totalSelfHours: Math.round(totalSelfHours * 100) / 100,
     totalEstHours: Math.round(totalEstHours * 100) / 100,
     totalScore: Math.round(totalScore * 100) / 100,
-    evalGood,
-    evalPass,
-    evalOther,
+    evaluationGood,
+    evaluationPass,
+    evaluationOther,
   }
 }
 

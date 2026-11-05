@@ -86,7 +86,7 @@
           <template #default="{ $index }">
             <el-tag
               v-if="props.detailResults[$index]?.remote?._links?.customField62?.title"
-              :type="evalTagType(props.detailResults[$index].remote?._links?.customField62?.title)"
+              :type="evaluationTagType(props.detailResults[$index].remote?._links?.customField62?.title)"
             >
               {{ props.detailResults[$index].remote?._links?.customField62?.title }}
             </el-tag>
@@ -182,7 +182,7 @@
 import { ref, reactive } from 'vue'
 import type { TaskItem, TaskDetailResult } from '@/types/task'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
-import { statusTagType, evalTagType, taskTypeTagType } from '@/utils/tag'
+import { statusTagType, evaluationTagType, taskTypeTagType } from '@/utils/tag'
 
 const props = defineProps<{
   tasks: TaskItem[]

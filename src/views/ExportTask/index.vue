@@ -48,13 +48,13 @@
       >
       <el-divider direction="vertical" />
       <span class="stat-item"
-        >好 <strong>{{ stats.evalGood }}</strong></span
+        >好 <strong>{{ stats.evaluationGood }}</strong></span
       >
       <span class="stat-item"
-        >合格 <strong>{{ stats.evalPass }}</strong></span
+        >合格 <strong>{{ stats.evaluationPass }}</strong></span
       >
       <span class="stat-item"
-        >其他 <strong>{{ stats.evalOther }}</strong></span
+        >其他 <strong>{{ stats.evaluationOther }}</strong></span
       >
     </div>
 

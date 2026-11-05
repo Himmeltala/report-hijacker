@@ -133,7 +133,7 @@ function reconcilePendingUpdate(): void {
 // #region 文件工具
 
 // 计算文件 MD5，流式读取避免整包进内存
-function md5File(file: string): Promise<string> {
+function computeFileMd5(file: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash('md5')
     const stream = createReadStream(file)
@@ -254,7 +254,7 @@ function createProgressReporter(send: (p: UpdateProgress) => void): (p: UpdatePr
  */
 async function checkShare(sharePath: string, installedMd5: string): Promise<CheckPayload> {
   const installer = resolveShareInstaller(sharePath)
-  const md5 = await md5File(installer.filePath)
+  const md5 = await computeFileMd5(installer.filePath)
   const version = parseVersion(installer.fileName)
   // 还没有记录时先把当前包的 MD5 补成基线，此时不提示；之后 MD5 变了才提示更新
   const hasUpdate = !!installedMd5 && md5 !== installedMd5
@@ -409,7 +409,7 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
     }
 
     const expected = String(payload.md5 || '').toLowerCase()
-    const actual = await md5File(target)
+    const actual = await computeFileMd5(target)
     if (expected && actual !== expected) {
       rmSync(target, { force: true })
       return { started: false, error: '更新包 MD5 校验不通过，请重新检查更新' }

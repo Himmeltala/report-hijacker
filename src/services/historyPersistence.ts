@@ -29,7 +29,7 @@ function safeClone(obj: any): any {
   )
 }
 
-function sameIdSet(a: Set<string>, b: Set<string>): boolean {
+function haveSameIds(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false
   for (const id of a) {
     if (!b.has(id)) return false
@@ -167,7 +167,7 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
         }
       }
       // 任务 ID 与内容均无变化时跳过写入，内容有差异必须落盘
-      if (sameIdSet(existingIds, mergedIds) && sameTasksContent(day.tasks, existing.tasks)) {
+      if (haveSameIds(existingIds, mergedIds) && sameTasksContent(day.tasks, existing.tasks)) {
         continue
       }
       // 已有日期保留原始 createdAt
