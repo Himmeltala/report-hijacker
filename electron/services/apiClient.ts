@@ -55,7 +55,7 @@ export function createApiClient(getBaseUrl: () => string): ApiClient {
     },
 
     // 获取单个工作包详情
-    getWorkPackage<T = any>(id: string, cookie: string): Promise<T> {
+    getWorkPackage<T = any>(this: ApiClient, id: string, cookie: string): Promise<T> {
       return this.get<T>(`/api/v3/work_packages/${id}`, cookie)
     },
 

@@ -9,7 +9,7 @@
 
 import { app, ipcMain } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, renameSync, rmSync } from 'fs'
 import { readJsonFile, writeJsonAtomic } from '@electron/utils'
 
 // #region 辅助函数
