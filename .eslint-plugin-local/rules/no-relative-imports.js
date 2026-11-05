@@ -1,10 +1,10 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-10
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-10
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:11:32
  * @FilePath: .eslint-plugin-local/rules/no-relative-imports.js
- * @Description: 禁止相对路径导入，强制使用 @/ 或 @electron/ 路径别名
+ * @Description: 禁止相对路径导入，强制使用 @/、@electron/ 或 @schedules/ 路径别名
  */
 
 import path from 'path'
@@ -15,6 +15,7 @@ const ROOT = process.cwd()
 const ALIAS_MAP = [
   { prefix: '@', dir: path.join(ROOT, 'src') },
   { prefix: '@electron', dir: path.join(ROOT, 'electron') },
+  { prefix: '@schedules', dir: path.join(ROOT, 'schedules') },
 ]
 
 /**

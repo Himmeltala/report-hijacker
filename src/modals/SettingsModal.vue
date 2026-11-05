@@ -212,7 +212,7 @@ async function onChange(key: string, value: any) {
   }
 }
 
-/** 将日志面板设置同步到日志 store 即时生效，导入或重置后同样需要同步，避免行数与高度停留旧值 */
+// 将日志面板设置同步到日志 store 即时生效，导入或重置后同样需要同步，避免行数与高度停留旧值
 function syncLogStoreSettings() {
   const maxLines = settingValues.value['appearance.logMaxLines']
   if (maxLines !== undefined && maxLines !== null) {

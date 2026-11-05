@@ -8,7 +8,7 @@
  */
 
 import { existsSync, rmSync, renameSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 

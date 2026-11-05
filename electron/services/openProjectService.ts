@@ -1,48 +1,65 @@
 /*
- * @Author: zhengrenfu
- * @Date: 2026-08-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
- * @FilePath: \electron\services\notificationService.ts
- * @Description: 平台通知服务：通知拉取、工作包详情补全与已读标记 IPC
+ * @Author: Himmeltala
+ * @Date: 2026-11-05 10:30:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:40:00
+ * @FilePath: \electron\services\openProjectService.ts
+ * @Description: OpenProject 取数服务：任务详情、评论区与平台通知 IPC
  */
 
 import { ipcMain } from 'electron'
 import type { ApiClient } from '@electron/services/apiClient'
 import type { NotificationElement } from '@/types/api'
 import { extractWpId } from '@electron/utils'
+import { mapWithConcurrency } from '@electron/concurrency'
 
-// #region 常量
-
-/** 工作包详情补全请求的并发上限，防止大批量通知打爆平台接口 */
+// 工作包详情补全请求的并发上限，防止大批量通知打爆平台接口
 const DETAIL_CONCURRENCY = 5
 
-/** 逐条标记已读的并发上限 */
+// 逐条标记已读的并发上限
 const MARK_READ_CONCURRENCY = 5
 
-// #endregion
-
-// #region 已读标记
-
-/**
- * 逐条标记已读：这套部署的集合接口 read_ian 不可用，定向标记只能走单条
- * @param {ApiClient} api API 客户端
- * @param {number} id 通知 ID
- * @param {string} cookie 登录 Cookie
- */
+// 逐条标记已读：这套部署的集合接口 read_ian 不可用，定向标记只能走单条
 async function markOneRead(api: ApiClient, id: number, cookie: string): Promise<void> {
   await api.post(`/api/v3/notifications/${id}/read_ian`, cookie, {})
 }
 
-// #endregion
+// 注册任务详情、评论区与平台通知 IPC
+export function setupOpenProjectIpc(api: ApiClient): void {
+  // #region 任务详情与评论区
 
-// #region IPC 注册
+  ipcMain.handle('api:fetchTaskDetail', async (_e, params: { rawUrl: string; cookie: string }) => {
+    const { rawUrl, cookie } = params
+    const taskId = extractWpId(rawUrl) || ''
+    if (!taskId) return { serTaskId: '', serError: '无法从链接提取任务ID' }
 
-/**
- * 注册通知相关 IPC
- * @param {object} api API 客户端
- */
-export function setupNotificationIpc(api: ApiClient): void {
+    try {
+      // 透传完整原始 API 响应，不裁剪字段
+      const remote = await api.getWorkPackage(taskId, cookie)
+      return { serTaskId: taskId, remote }
+    } catch (e: any) {
+      return { serTaskId: taskId, serError: `获取任务详情失败: ${e.message}` }
+    }
+  })
+
+  ipcMain.handle('api:checkComments', async (_e, params) => {
+    const { taskId, cookie } = params
+    if (!taskId || !cookie) throw new Error('缺少 taskId 或 cookie')
+
+    try {
+      // 透传完整原始 API 响应，不裁剪字段
+      return await api.get(`/api/v3/work_packages/${taskId}/activities`, cookie)
+    } catch (e: any) {
+      // 404 表示任务无活动记录，返回空数据
+      if (String(e.message).includes('404')) {
+        return { _type: 'Collection', total: 0, count: 0, _embedded: { elements: [] }, _links: {} }
+      }
+      throw e
+    }
+  })
+
+  // #endregion
+
   // #region 通知拉取
 
   ipcMain.handle('api:fetchNotifications', async (_e, params) => {
@@ -73,15 +90,9 @@ export function setupNotificationIpc(api: ApiClient): void {
     if (wpIdSet.size > 0) {
       const ids = Array.from(wpIdSet)
       // 限并发获取工作包详情，避免触发平台限流
-      const details: Array<any | null> = new Array(ids.length)
-      let nextIndex = 0
-      const worker = async () => {
-        while (nextIndex < ids.length) {
-          const index = nextIndex++
-          details[index] = await api.get(`/api/v3/work_packages/${ids[index]}`, cookie).catch(() => null)
-        }
-      }
-      await Promise.all(Array.from({ length: Math.min(DETAIL_CONCURRENCY, ids.length) }, () => worker()))
+      const details = await mapWithConcurrency(ids, DETAIL_CONCURRENCY, (id) =>
+        api.getWorkPackage(id, cookie).catch(() => null),
+      )
       for (let i = 0; i < ids.length; i++) {
         if (details[i]) wpMap[ids[i]] = details[i]
       }
@@ -93,7 +104,6 @@ export function setupNotificationIpc(api: ApiClient): void {
       const detail = wpId ? wpMap[wpId] : null
       return {
         ...el,
-        _wpId: wpId,
         _workPackageId: wpId ? Number(wpId) : null,
         _workPackageStatus: detail?._embedded?.status?.name || '',
         _workPackageType: detail?._links?.type?.title || detail?._embedded?.type?.name || '',
@@ -128,19 +138,14 @@ export function setupNotificationIpc(api: ApiClient): void {
     if (!ids?.length || !cookie) throw new Error('缺少 ids 或 cookie')
 
     const failed: number[] = []
-    let nextIndex = 0
-    const worker = async () => {
-      while (nextIndex < ids.length) {
-        const id = ids[nextIndex++]
-        try {
-          await markOneRead(api, id, cookie)
-        } catch (e: any) {
-          console.error(`[通知] 标记已读失败 ID=${id}:`, e.message)
-          failed.push(id)
-        }
+    await mapWithConcurrency(ids, MARK_READ_CONCURRENCY, async (id: number) => {
+      try {
+        await markOneRead(api, id, cookie)
+      } catch (e: any) {
+        console.error(`[通知] 标记已读失败 ID=${id}:`, e.message)
+        failed.push(id)
       }
-    }
-    await Promise.all(Array.from({ length: Math.min(MARK_READ_CONCURRENCY, ids.length) }, () => worker()))
+    })
 
     // 部分失败时如实报错，避免界面把没标记成功的条目当成已读删掉
     if (failed.length > 0) {
@@ -151,5 +156,3 @@ export function setupNotificationIpc(api: ApiClient): void {
 
   // #endregion
 }
-
-// #endregion

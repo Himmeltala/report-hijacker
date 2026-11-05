@@ -12,8 +12,15 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@electron/*": ["./electron/*"]
+      "@electron/*": ["./electron/*"],
+      "@schedules/*": ["./schedules/*"]
     }
   },
-  "include": ["vite.config.ts", "electron/**/*.ts", "electron-builder.yml", "package.json"]
+  "include": [
+    "vite.config.ts",
+    "electron/**/*.ts",
+    "schedules/main/**/*.ts",
+    "electron-builder.yml",
+    "package.json"
+  ]
 }

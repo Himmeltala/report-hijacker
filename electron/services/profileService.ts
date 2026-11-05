@@ -1,16 +1,16 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:40:00
  * @FilePath: \electron\services\profileService.ts
  * @Description: 用户档案服务：档案目录管理及档案 IPC
  */
 
 import { app, ipcMain } from 'electron'
-import { join, dirname } from 'path'
-import { existsSync, mkdirSync, writeFileSync, renameSync, rmSync } from 'fs'
-import { readJsonFile } from '@electron/utils'
+import { join } from 'path'
+import { existsSync, mkdirSync, rmSync } from 'fs'
+import { readJsonFile, writeJsonAtomic } from '@electron/utils'
 
 // #region 辅助函数
 
@@ -74,15 +74,9 @@ function readActiveProfile(): string {
   return data.name || ''
 }
 
-/**
- * 写入当前激活档案名，原子写入避免崩溃留下截断文件
- * @param {string} name 档案名称
- */
+// 写入当前激活档案名，原子写入避免崩溃留下截断文件
 function writeActiveProfile(name: string): void {
-  mkdirSync(dirname(getActiveProfilePath()), { recursive: true })
-  const tmpPath = `${getActiveProfilePath()}.tmp`
-  writeFileSync(tmpPath, JSON.stringify({ name }), 'utf-8')
-  renameSync(tmpPath, getActiveProfilePath())
+  writeJsonAtomic(getActiveProfilePath(), { name }, 0)
 }
 
 function readProfilesList(): string[] {
@@ -90,7 +84,7 @@ function readProfilesList(): string[] {
 }
 
 function writeProfilesList(names: string[]): void {
-  writeFileSync(getProfilesListPath(), JSON.stringify(names), 'utf-8')
+  writeJsonAtomic(getProfilesListPath(), names, 0)
 }
 
 /**

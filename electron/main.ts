@@ -1,32 +1,35 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-07-15 09:54:03
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:40:00
  * @FilePath: \electron\main.ts
  * @Description: 主进程入口：窗口、菜单、档案激活与各服务装配
  */
 import { app, BrowserWindow, Menu, shell, dialog } from 'electron'
 import { join } from 'path'
 import { mkdirSync } from 'fs'
-import { resolveFirstExisting } from '@electron/utils'
+import { resolveFirstExisting, sendToWindow } from '@electron/utils'
 import { createApiClient } from '@electron/services/apiClient'
 import { AppSettings, setupSettingsIpc } from '@electron/services/settingsService'
+import { setupFileIpc } from '@electron/services/fileService'
+import { setupStoreIpc } from '@electron/services/storeService'
 import {
   initProfileSystem,
   getProfileDir,
   getProfileSettingsPath,
   setupProfileIpc,
 } from '@electron/services/profileService'
-import { setupTaskDetailIpc } from '@electron/services/taskDetailService'
+import { setupOpenProjectIpc } from '@electron/services/openProjectService'
 import { setupAiChatIpc } from '@electron/services/aiChatService'
-import { setupNotificationIpc } from '@electron/services/notificationService'
 import { setupSysNotificationIpc } from '@electron/services/sysNotificationService'
 import { setupExcelIpc } from '@electron/services/excelService'
-import { setupHistoryIpc, performBackup } from '@electron/services/historyService'
+import { setupHistoryIpc } from '@electron/services/historyService'
 import { setupUpdateService } from '@electron/services/updateService'
+import { setupBackupSchedule } from '@schedules/main/backupSchedule'
+import { setupUpdateSchedule } from '@schedules/main/updateSchedule'
 
-/** 窗口标题与任务栏用中文；存储路径由 package.json 的 productName 决定，保持英文 */
+// 窗口标题与任务栏用中文；存储路径由 package.json 的 productName 决定，保持英文
 const APP_TITLE = '任务管理器'
 let mainWindow: BrowserWindow | null = null
 
@@ -34,54 +37,23 @@ let activeProfile = ''
 let schemaPathForReinit = ''
 let settings: AppSettings
 
-let backupTimer: ReturnType<typeof setInterval> | null = null
-
-/** 更新检查定时器的重建入口，设置变更与切换档案后调用 */
+// 备份与更新检查定时器的重建入口，设置变更与切换档案后调用
+let restartBackupSchedule: () => void = () => {}
 let restartUpdateScheduler: () => void = () => {}
 
 // #region 数据目录
-/** 获取当前激活档案的存储目录 */
+// 获取当前激活档案的存储目录
 function getStoreDir(): string {
   const dir = join(getProfileDir(activeProfile), 'store')
   mkdirSync(dir, { recursive: true })
   return dir
 }
 
-/** 获取当前激活档案的历史目录 */
+// 获取当前激活档案的历史目录
 function getHistoryDir(): string {
   const dir = join(getProfileDir(activeProfile), 'history')
   mkdirSync(dir, { recursive: true })
   return dir
-}
-// #endregion
-
-// #region 备份定时器
-/** 备份间隔下限（分钟），防止非法配置导致高频备份 */
-const MIN_BACKUP_INTERVAL = 10
-
-function setupBackup(): void {
-  if (backupTimer) {
-    clearInterval(backupTimer)
-    backupTimer = null
-  }
-  const enabled = settings.get('history.backupEnabled', false)
-  if (!enabled) return
-  const intervalMin = Math.max(
-    MIN_BACKUP_INTERVAL,
-    Number(settings.get('history.backupInterval', 60)) || MIN_BACKUP_INTERVAL,
-  )
-  const dirs: string[] = settings.get('history.backupDirectories', [])
-  if (!dirs.length) return
-  backupTimer = setInterval(
-    () => {
-      const ok = performBackup(dirs, getHistoryDir, getStoreDir)
-      // 备份成功后通知渲染进程刷新上次备份时间
-      if (ok > 0) {
-        mainWindow?.webContents.send('event:backupCompleted')
-      }
-    },
-    intervalMin * 60 * 1000,
-  )
 }
 // #endregion
 
@@ -97,7 +69,6 @@ function setupMenu(): void {
       label: '系统',
       submenu: [
         { label: '设置', click: () => send('settings') },
-        { label: '检查更新', click: () => send('checkUpdate') },
         { type: 'separator' },
         // 不带快捷键，Alt+F4 由系统处理
         { label: '退出', role: 'quit' },
@@ -106,7 +77,6 @@ function setupMenu(): void {
     {
       label: '工具',
       submenu: [
-        { label: '数据迁移', click: () => send('migrate') },
         {
           label: '开发者工具',
           click: () => {
@@ -180,13 +150,13 @@ function createWindow(): void {
 // #endregion
 
 // #region 档案激活
-/** 激活指定档案：重建 settings 实例、重启备份定时器、通知渲染进程 */
+// 激活指定档案：重建 settings 实例、重启备份定时器、通知渲染进程
 function activateProfile(name: string): void {
   activeProfile = name
   settings = new AppSettings(getProfileSettingsPath(name), schemaPathForReinit)
-  setupBackup()
+  restartBackupSchedule()
   restartUpdateScheduler()
-  mainWindow?.webContents.send('profile:switched', name)
+  sendToWindow(() => mainWindow, 'profile:switched', name)
 }
 // #endregion
 
@@ -194,29 +164,36 @@ function activateProfile(name: string): void {
 function setupIpcHandlers(): void {
   const api = createApiClient(() => settings.get('connection.apiBaseUrl', 'https://xmgl.cdrunnet.com'))
 
-  // 更新服务先装配：更新设置的变更回调需要拿到定时器重建入口
-  const updater = setupUpdateService({ getSettings: () => settings, getWindow: () => mainWindow })
-  restartUpdateScheduler = updater.restartScheduler
+  setupUpdateService({ getSettings: () => settings, getWindow: () => mainWindow })
+  restartUpdateScheduler = setupUpdateSchedule({
+    getSettings: () => settings,
+    getWindow: () => mainWindow,
+  }).restart
+  restartBackupSchedule = setupBackupSchedule({
+    getSettings: () => settings,
+    getHistoryDir,
+    getStoreDir,
+    getWindow: () => mainWindow,
+  }).restart
 
   setupSettingsIpc({
     getSettings: () => settings,
-    mainWindow,
-    getStoreDir,
-    onBackupSettingChanged: setupBackup,
+    getWindow: () => mainWindow,
+    onBackupSettingChanged: () => restartBackupSchedule(),
     onUpdateSettingChanged: () => restartUpdateScheduler(),
   })
-  setupTaskDetailIpc(api)
+  setupStoreIpc({ getStoreDir })
+  setupFileIpc({ getWindow: () => mainWindow })
+  setupOpenProjectIpc(api)
   setupAiChatIpc({ getSettings: () => settings })
-  setupNotificationIpc(api)
   setupSysNotificationIpc(() => mainWindow)
-  setupExcelIpc({ api, mainWindow })
+  setupExcelIpc(api)
   setupHistoryIpc({
     api,
     getSettings: () => settings,
     getHistoryDir,
     getStoreDir,
-    performBackupFn: performBackup,
-    restartBackup: setupBackup,
+    getWindow: () => mainWindow,
   })
   setupProfileIpc({
     getActiveProfile: () => activeProfile,
@@ -262,7 +239,8 @@ app
     setupIpcHandlers()
     createWindow()
     setupMenu()
-    setupBackup()
+    restartBackupSchedule()
+    restartUpdateScheduler()
   })
   .catch((e) => {
     console.error('[App] 启动失败:', e)

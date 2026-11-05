@@ -1,8 +1,8 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:45:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: 描述
  */
@@ -32,16 +32,16 @@ export interface HistoryTaskItem {
   rawText: string
   serSyncStatus: 'none' | 'synced'
   serWorkPackageId: string | null
-  /** 远程原始数据，只读，平台字段原封不动 */
+  // 远程原始数据，只读，平台字段原封不动
   remote: ReadonlyRawWorkPackage | null
   serSyncedAt: string | null
-  /** AI 审查结论，未执行 AI 审查时为 null */
+  // AI 审查结论，未执行 AI 审查时为 null
   serAiConclusion?: string | null
-  /** 任务优先级：高、中、低 */
+  // 任务优先级：高、中、低
   serPriority: 'high' | 'medium' | 'low' | null
-  /** 限时任务：今日、临时 */
+  // 限时任务：今日、临时
   serTimeLimit: 'today' | 'temp' | null
-  /** 是否为延期任务（本地标记） */
+  // 是否为延期任务（本地标记）
   serPostponed: boolean
   serPostponedReason: string
   serCreatedAt: string
@@ -66,7 +66,7 @@ export interface CheckCommentsParams {
 }
 
 export interface AiChatParams {
-  /** 占位符替换后的最终提示词 */
+  // 占位符替换后的最终提示词
   prompt: string
 }
 
@@ -86,7 +86,6 @@ export interface FillExcelTemplateParams {
   targetPath: string
   handlerName: string
   cookie: string
-  validationResults?: any[]
 }
 
 export interface WriteTextFileParams {
@@ -171,31 +170,19 @@ export interface IpcApi {
       taskId: string
       workPackageId: string | null
       exists: boolean
-      /** 远程原始数据（只读） */
+      // 远程原始数据（只读）
       remote: ReadonlyRawWorkPackage | null
       error?: string
     }>
   >
 
   restoreHistoryFromDir: () => Promise<{
-    /** 成功恢复的历史文件数 */
+    // 成功恢复的历史文件数
     count: number
-    /** 源目录里存在多份来源的日期个数 */
-    conflictCount: number
   }>
   backupNow: (
     dirs?: string[],
   ) => Promise<{ success: boolean; message?: string; count?: number; total?: number; time?: string }>
-  migrateHistoryLayout: () => Promise<{
-    /** 扫描到的待迁移文件数 */
-    total: number
-    /** 成功搬进年月层级目录的文件数 */
-    moved: number
-    /** 目标位置已有同名文件而跳过的数量 */
-    skipped: number
-    /** 迁移失败的数量 */
-    failed: number
-  }>
 
   profileCurrent: () => Promise<string>
   profileList: () => Promise<string[]>

@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 08:54:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \src\views\HistoryTask\index.vue
  * @Description: 历史任务页面
 -->
@@ -282,6 +282,7 @@ import { taskMatchesKeyword } from '@/services/taskSearch'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
 import { maybeShowSysNotification } from '@/utils/sysNotification'
 import { ipc } from '@/utils/ipc'
+import { createAutoSyncSchedule } from '@schedules/renderer/autoSyncSchedule'
 import CompareWithLastDrawer from '@/views/HistoryTask/components/CompareWithLastDrawer.vue'
 import StatsOverviewDrawer from '@/views/HistoryTask/components/StatsOverviewDrawer.vue'
 import FilterBar, { createDefaultFilterState, type FilterState } from '@/views/HistoryTask/components/FilterBar.vue'
@@ -346,8 +347,6 @@ const backingUp = ref(false)
 const lastBackupTime = ref('')
 const autoSyncRunning = ref(false)
 const autoSyncEnabled = ref(false)
-let autoSyncTimer: ReturnType<typeof setInterval> | null = null
-let autoSyncInitTimer: ReturnType<typeof setTimeout> | null = null
 // 自动同步设置变更事件的取消订阅函数，页面卸载时移除监听
 let unsubscribeAutoSync: (() => void) | null = null
 // 自动备份完成事件的取消订阅函数，页面卸载时移除监听
@@ -1499,11 +1498,9 @@ async function handleBackupNow() {
 
 async function handleRestoreBackup() {
   try {
-    const { count, conflictCount } = await ipc.restoreHistoryFromDir()
+    const { count } = await ipc.restoreHistoryFromDir()
     if (count > 0) {
-      // 冲突日期仅提示，恢复已按每日期一份完成
-      const conflictTip = conflictCount > 0 ? `，另有 ${conflictCount} 个日期在备份目录里有多份，已各取最新的一份` : ''
-      logStore.addLog('success', `已从备份目录恢复 ${count} 个历史文件${conflictTip}`)
+      logStore.addLog('success', `已从备份目录恢复 ${count} 个历史文件`)
       await loadRange()
     } else {
       logStore.addLog('info', '备份目录无有效历史文件')
@@ -1542,50 +1539,29 @@ async function runAutoSync() {
   }
 }
 
+const autoSyncSchedule = createAutoSyncSchedule({
+  isEligible: () => containsToday.value,
+  isEnabled: async () => {
+    const enabled = await ipc.getSetting('history.autoSyncEnabled')
+    autoSyncEnabled.value = !!enabled
+    return !!enabled
+  },
+  getIntervalMs: async () => {
+    const intervalMin = (await ipc.getSetting('history.autoSyncInterval')) || 5
+    return intervalMin * 60 * 1000
+  },
+  getLastRunAt: () => ipc.storeGet('lastAutoSyncTime'),
+  run: () => runAutoSync(),
+})
+
 function stopAutoSync() {
-  if (autoSyncTimer) {
-    clearInterval(autoSyncTimer)
-    autoSyncTimer = null
-  }
-  if (autoSyncInitTimer) {
-    clearTimeout(autoSyncInitTimer)
-    autoSyncInitTimer = null
-  }
+  autoSyncSchedule.stop()
 }
 
-/**
- * 重启自动同步定时器
- * @param skipImmediate true 时跳过页面加载的周期判断
- */
+// 重启自动同步定时器，skipImmediate 为 true 时跳过页面加载的周期判断
 async function restartAutoSync(skipImmediate = false) {
-  stopAutoSync()
   autoSyncEnabled.value = false
-  if (!containsToday.value) return
-
-  const enabled = await ipc.getSetting('history.autoSyncEnabled')
-  if (!enabled) return
-
-  autoSyncEnabled.value = true
-  const intervalMin = (await ipc.getSetting('history.autoSyncInterval')) || 5
-  const intervalMs = Math.max(60000, intervalMin * 60 * 1000)
-
-  if (!skipImmediate) {
-    // 页面加载：比较上次同步时间与周期，仅到期才执行
-    const lastTime = await ipc.storeGet('lastAutoSyncTime')
-    const now = Date.now()
-    const elapsed = lastTime ? now - new Date(lastTime).getTime() : Infinity
-    const remaining = Math.max(0, intervalMs - elapsed)
-
-    if (remaining <= 1000) {
-      // 已过一个周期或从未同步，延迟 1s 后执行
-      autoSyncInitTimer = setTimeout(() => runAutoSync(), 1000)
-    } else {
-      // 距下次执行还有时间，等待剩余时长
-      autoSyncInitTimer = setTimeout(() => runAutoSync(), remaining)
-    }
-  }
-
-  autoSyncTimer = setInterval(() => runAutoSync(), intervalMs)
+  await autoSyncSchedule.restart(skipImmediate)
 }
 // #endregion
 

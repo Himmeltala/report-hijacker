@@ -61,7 +61,7 @@ const emit = defineEmits<{
 
 const saveDate = ref(props.defaultDate)
 
-/** 使用函数形式确保每次点击时重新计算日期 */
+// 使用函数形式确保每次点击时重新计算日期
 const dateShortcuts = [
   {
     text: '今天',

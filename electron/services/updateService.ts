@@ -1,8 +1,8 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-11-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:43:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:40:00
  * @FilePath: \electron\services\updateService.ts
  * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后启动安装程序
  */
@@ -19,52 +19,47 @@ import {
   readFileSync,
   rmSync,
   statSync,
-  writeFileSync,
 } from 'fs'
 import { basename, extname, join } from 'path'
+import { sendToWindow, writeJsonAtomic } from '@electron/utils'
 import type { AppSettings } from '@electron/services/settingsService'
 import type {
   UpdateApplyParams,
   UpdateApplyResult,
   UpdateCheckResult,
+  UpdateFrequency,
   UpdateProgress,
   UpdateStatus,
 } from '@/types/update'
 
 // #region 常量
 
-/** 检查接口请求超时 */
+// 检查接口请求超时
 const HTTP_TIMEOUT_MS = 30_000
 
-/** 下载安装包的网络超时，安装包较大，留足时间 */
+// 下载安装包的网络超时，安装包较大，留足时间
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
 
-/** 自动检查间隔下限（小时），防止非法配置导致高频检查 */
-const MIN_INTERVAL_HOURS = 1
-
-/** 启动检查延迟，避开启动阶段的网络与磁盘争用 */
-const STARTUP_CHECK_DELAY_MS = 30_000
-
-/** 进度事件发送节流间隔 */
+// 进度事件发送节流间隔
 const PROGRESS_INTERVAL_MS = 200
 
-/** 启动安装程序后等待多久退出本程序 */
+// 启动安装程序后等待多久退出本程序
 const QUIT_DELAY_MS = 1_500
 
 // #endregion
 
 // #region 类型
 
-/** 更新状态文件内容，记录已安装安装包的 MD5 用于判断共享盘安装包是否变化 */
+// 更新状态文件内容，记录已安装安装包的 MD5 用于判断共享盘安装包是否变化
 interface UpdateState {
   installedMd5: string
   installedVersion: string
   lastCheckAt: string
-  /** 已启动安装但尚未确认安装成功的更新包，下次启动时对账 */
+  // 已启动安装但尚未确认安装成功的更新包，下次启动时对账
   pending?: { md5: string; version: string; at: string }
 }
 
-/** 检查结果去掉检查时间，由统一入口补上 */
+// 检查结果去掉检查时间，由统一入口补上
 type CheckPayload = Omit<UpdateCheckResult, 'checkedAt'>
 
 /** 共用的依赖注入 */
@@ -73,7 +68,7 @@ export interface UpdateDeps {
   getWindow: () => BrowserWindow | null
 }
 
-/** 单个安装包的位置与基本信息 */
+// 单个安装包的位置与基本信息
 interface InstallerFile {
   filePath: string
   fileName: string
@@ -84,7 +79,7 @@ interface InstallerFile {
 
 // #region 状态文件
 
-/** 更新相关文件的存放目录 */
+// 更新相关文件的存放目录
 function updateDir(): string {
   const dir = join(app.getPath('userData'), 'update')
   mkdirSync(dir, { recursive: true })
@@ -95,7 +90,7 @@ function stateFilePath(): string {
   return join(updateDir(), 'update-state.json')
 }
 
-/** 读取更新状态文件，缺失或损坏时返回空状态 */
+// 读取更新状态文件，缺失或损坏时返回空状态
 function readState(): UpdateState {
   try {
     const raw = JSON.parse(readFileSync(stateFilePath(), 'utf-8'))
@@ -111,8 +106,7 @@ function readState(): UpdateState {
 }
 
 function writeState(state: UpdateState): void {
-  mkdirSync(updateDir(), { recursive: true })
-  writeFileSync(stateFilePath(), JSON.stringify(state, null, 2), 'utf-8')
+  writeJsonAtomic(stateFilePath(), state, 2)
 }
 
 /**
@@ -138,7 +132,7 @@ function reconcilePendingUpdate(): void {
 
 // #region 文件工具
 
-/** 计算文件 MD5，流式读取避免整包进内存 */
+// 计算文件 MD5，流式读取避免整包进内存
 function md5File(file: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash('md5')
@@ -149,13 +143,13 @@ function md5File(file: string): Promise<string> {
   })
 }
 
-/** 从文件名里取版本号，取不到返回空字符串 */
+// 从文件名里取版本号，取不到返回空字符串
 function parseVersion(fileName: string): string {
   const match = /(\d+\.\d+\.\d+(?:\.\d+)?)/.exec(fileName)
   return match ? match[1] : ''
 }
 
-/** 取目录中修改时间最新的 exe 安装包 */
+// 取目录中修改时间最新的 exe 安装包
 function pickLatestInstaller(dir: string): InstallerFile | null {
   let latest: (InstallerFile & { mtime: number }) | null = null
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -193,7 +187,7 @@ function resolveShareInstaller(sharePath: string): InstallerFile {
   return latest
 }
 
-/** 带进度的文件复制 */
+// 带进度的文件复制
 function copyWithProgress(src: string, dest: string, report: (p: UpdateProgress) => void): Promise<void> {
   const total = statSync(src).size
   let received = 0
@@ -214,7 +208,7 @@ function copyWithProgress(src: string, dest: string, report: (p: UpdateProgress)
   })
 }
 
-/** 带进度的安装包下载 */
+// 带进度的安装包下载
 async function downloadWithProgress(url: string, dest: string, report: (p: UpdateProgress) => void): Promise<void> {
   const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
   if (!response.ok || !response.body) throw new Error(`下载更新包失败: HTTP ${response.status}`)
@@ -237,14 +231,7 @@ async function downloadWithProgress(url: string, dest: string, report: (p: Updat
   })
 }
 
-/** 向渲染进程发送事件，窗口已销毁时静默跳过 */
-function sendToWindow(deps: UpdateDeps, channel: string, payload: unknown): void {
-  const win = deps.getWindow()
-  if (!win || win.isDestroyed()) return
-  win.webContents.send(channel, payload)
-}
-
-/** 进度上报节流包装 */
+// 进度上报节流包装
 function createProgressReporter(send: (p: UpdateProgress) => void): (p: UpdateProgress) => void {
   let last = 0
   return (p) => {
@@ -282,7 +269,7 @@ async function checkShare(sharePath: string, installedMd5: string): Promise<Chec
   }
 }
 
-/** 把接口返回的下载地址转成绝对地址，相对路径按接口地址补全 */
+// 把接口返回的下载地址转成绝对地址，相对路径按接口地址补全
 function resolveDownloadUrl(raw: string, apiUrl: string): string {
   const value = String(raw || '').trim()
   if (!value) return ''
@@ -293,7 +280,7 @@ function resolveDownloadUrl(raw: string, apiUrl: string): string {
   }
 }
 
-/** 接口方式检查：版本号或 MD5 与已安装的不同即视为有更新 */
+// 接口方式检查：版本号或 MD5 与已安装的不同即视为有更新
 async function checkHttp(apiUrl: string, installedMd5: string): Promise<CheckPayload> {
   const url = String(apiUrl || '').trim()
   if (!url) throw new Error('未设置更新接口地址')
@@ -322,7 +309,7 @@ async function checkHttp(apiUrl: string, installedMd5: string): Promise<CheckPay
  */
 async function checkForUpdate(deps: UpdateDeps): Promise<UpdateCheckResult> {
   const settings = deps.getSettings()
-  const source: 'share' | 'http' = settings.get('update.mode', 'share') === 'http' ? 'http' : 'share'
+  const source: 'share' | 'http' = settings.get('update.mode', 'http') === 'share' ? 'share' : 'http'
   const state = readState()
   const checkedAt = new Date().toISOString()
   let payload: CheckPayload
@@ -344,16 +331,23 @@ async function checkForUpdate(deps: UpdateDeps): Promise<UpdateCheckResult> {
   return { ...payload, checkedAt }
 }
 
-/** 组装设置面板用的更新状态 */
+// 读取更新频率，非法值按定时检查处理
+export function readUpdateFrequency(settings: AppSettings): UpdateFrequency {
+  const value = settings.get('update.frequency', 'interval')
+  return value === 'startup' || value === 'off' ? value : 'interval'
+}
+
+// 组装设置面板用的更新状态
 function buildStatus(deps: UpdateDeps): UpdateStatus {
   const state = readState()
+  const settings = deps.getSettings()
   return {
     currentVersion: app.getVersion(),
     installedMd5: state.installedMd5,
     installedVersion: state.installedVersion,
     lastCheckAt: state.lastCheckAt || null,
-    mode: deps.getSettings().get('update.mode', 'share') === 'http' ? 'http' : 'share',
-    enabled: !!deps.getSettings().get('update.enabled', true),
+    mode: settings.get('update.mode', 'http') === 'share' ? 'share' : 'http',
+    frequency: readUpdateFrequency(settings),
     packaged: app.isPackaged,
     platform: process.platform,
   }
@@ -396,7 +390,7 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
   if (installing) return { started: false, error: '安装程序正在启动，请稍候' }
   if (!payload?.source) return { started: false, error: '缺少更新包信息' }
   if (process.platform !== 'win32') return { started: false, error: '仅 Windows 支持自动安装更新' }
-  const report = createProgressReporter((p) => sendToWindow(deps, 'event:updateProgress', p))
+  const report = createProgressReporter((p) => sendToWindow(deps.getWindow, 'event:updateProgress', p))
   const pkgDir = join(updateDir(), 'pkg')
   const fileName = basename(String(payload?.fileName || '').trim()) || 'installer.exe'
   const target = join(pkgDir, fileName)
@@ -448,16 +442,14 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
 
 // #region 自动检查
 
-let intervalTimer: ReturnType<typeof setInterval> | null = null
-/** 已启动安装程序，避免重复触发安装 */
+// 已启动安装程序，避免重复触发安装
 let installing = false
-let startupTimer: ReturnType<typeof setTimeout> | null = null
 let checking = false
-/** 本次运行已提示过的更新包标识，避免同一版本反复弹窗 */
+// 本次运行已提示过的更新包标识，避免同一版本反复弹窗
 let notifiedKey = ''
 
-/** 执行一次自动检查，发现新版本时通知渲染进程弹窗 */
-async function runAutoCheck(deps: UpdateDeps): Promise<void> {
+// 执行一次自动检查，发现新版本时通知渲染进程弹窗
+export async function runAutoCheck(deps: UpdateDeps): Promise<void> {
   if (checking) return
   checking = true
   try {
@@ -466,52 +458,23 @@ async function runAutoCheck(deps: UpdateDeps): Promise<void> {
     const key = result.md5 || result.version || ''
     if (!key || key === notifiedKey) return
     notifiedKey = key
-    sendToWindow(deps, 'event:updateAvailable', result)
+    sendToWindow(deps.getWindow, 'event:updateAvailable', result)
   } finally {
     checking = false
   }
-}
-
-/** 按设置重建自动检查定时器，设置变更与切换档案后调用 */
-function restartScheduler(deps: UpdateDeps): void {
-  if (intervalTimer) {
-    clearInterval(intervalTimer)
-    intervalTimer = null
-  }
-  if (startupTimer) {
-    clearTimeout(startupTimer)
-    startupTimer = null
-  }
-  // 开发模式不自动检查，避免共享盘路径为空时反复报错
-  if (!app.isPackaged) return
-  const settings = deps.getSettings()
-  if (!settings.get('update.enabled', true)) return
-  const hours = Math.max(MIN_INTERVAL_HOURS, Number(settings.get('update.intervalHours', 6)) || 6)
-  if (settings.get('update.checkOnStartup', true)) {
-    startupTimer = setTimeout(() => runAutoCheck(deps), STARTUP_CHECK_DELAY_MS)
-  }
-  intervalTimer = setInterval(() => runAutoCheck(deps), hours * 60 * 60 * 1000)
 }
 
 // #endregion
 
 // #region 装配
 
-/**
- * 注册更新相关 IPC 与自动检查定时器
- * @param {UpdateDeps} deps 设置与窗口依赖
- * @returns {{ restartScheduler: () => void }} 设置变更后重建定时器的入口
- */
-export function setupUpdateService(deps: UpdateDeps): { restartScheduler: () => void } {
+// 注册更新相关 IPC，定时检查由 schedules/main/updateSchedule.ts 负责
+export function setupUpdateService(deps: UpdateDeps): void {
   reconcilePendingUpdate()
 
   ipcMain.handle('update:check', () => checkForUpdate(deps))
   ipcMain.handle('update:status', () => buildStatus(deps))
   ipcMain.handle('update:apply', (_e, payload: UpdateApplyParams) => applyUpdate(deps, payload))
-
-  const restart = () => restartScheduler(deps)
-  restart()
-  return { restartScheduler: restart }
 }
 
 // #endregion

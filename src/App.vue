@@ -1,10 +1,10 @@
 <!--
  * @Author: zhengrenfu
- * @Date: 2026-07-14 01:46:05
+ * @Date: 2026-11-05 09:14:14
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-05 08:48:17
- * @FilePath: \src\App.vue
- * @Description: 描述
+ * @LastEditTime: 2026-11-05 10:19:41
+ * @FilePath: /pros/self/task-manager/src/App.vue
+ * @Description: 根组件
 -->
 <template>
   <div class="app-root" :class="themeClass">
@@ -108,7 +108,6 @@ const updater = useUpdater()
 
 const settingsModal = useModal({ component: () => import('@/modals/SettingsModal.vue') })
 const profileModal = useModal({ component: () => import('@/modals/ProfileModal.vue') })
-const migrationModal = useModal({ component: () => import('@/modals/MigrationModal.vue') })
 
 async function loadProfiles() {
   try {
@@ -186,12 +185,6 @@ const cleanupTheme = window.electron?.onThemeChanged?.((newTheme: string) => {
 
 const cleanupMenu = window.electron?.onMenuEvent?.(({ action }) => {
   if (action === 'settings') settingsModal.open()
-  if (action === 'migrate') migrationModal.open()
-  if (action === 'checkUpdate') {
-    updater.runCheck(true).then((result) => {
-      if (result?.hasUpdate) updater.offerUpdate(result)
-    })
-  }
 })
 
 // 自动检查发现新版本时由主进程推送，这里负责弹窗确认

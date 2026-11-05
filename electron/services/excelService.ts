@@ -1,29 +1,26 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:40:00
  * @FilePath: \electron\services\excelService.ts
- * @Description: 文件对话框与 Excel 模板填充服务
+ * @Description: Excel 模板填充服务
  */
 
-import { ipcMain, dialog, BrowserWindow, app } from 'electron'
+import { ipcMain, app } from 'electron'
 import { dirname, join } from 'path'
-import { copyFileSync, mkdirSync, writeFileSync } from 'fs'
+import { copyFileSync, mkdirSync } from 'fs'
 import { resolveFirstExisting, extractWpId, parseDurationToHours, formatDate } from '@electron/utils'
+import { mapWithConcurrency } from '@electron/concurrency'
 import type { ApiClient } from '@electron/services/apiClient'
+
+// 导出时获取工作包详情的并发上限，避免大批量导出打爆平台接口
+const DETAIL_CONCURRENCY = 5
 
 // #region IPC 注册
 
-/**
- * 注册文件对话框与 Excel 模板填充 IPC
- * @param {object} deps 依赖项
- * @param {any} deps.api API 客户端
- * @param {BrowserWindow | null} deps.mainWindow 主窗口
- */
-export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow | null }): void {
-  const { api, mainWindow } = deps
-
+// 注册 Excel 模板填充 IPC
+export function setupExcelIpc(api: ApiClient): void {
   // #region 模板路径
 
   // 结果缓存，避免重复 stat
@@ -37,33 +34,6 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
     ])
     return cachedTemplatePath
   }
-
-  // #endregion
-
-  // #region 文件对话框
-
-  ipcMain.handle('dialog:openFile', async (_e, params) => {
-    const { filters, properties } = params || {}
-    const result = await dialog.showOpenDialog(mainWindow!, {
-      properties: properties || ['openFile'],
-      filters: filters || [{ name: '所有文件', extensions: ['*'] }],
-    })
-    return result.canceled ? null : result.filePaths[0]
-  })
-
-  ipcMain.handle('dialog:saveFile', async (_e, params) => {
-    const { defaultName, filters } = params
-    const result = await dialog.showSaveDialog(mainWindow!, {
-      defaultPath: defaultName,
-      filters: filters || [{ name: 'Excel 文件', extensions: ['xlsx'] }],
-    })
-    return result.canceled ? null : result.filePath
-  })
-
-  ipcMain.handle('file:writeTextFile', async (_e, params) => {
-    const { filePath, content } = params
-    writeFileSync(filePath, content, 'utf-8')
-  })
 
   // #endregion
 
@@ -113,13 +83,11 @@ export function setupExcelIpc(deps: { api: ApiClient; mainWindow: BrowserWindow 
 
     const apiCache: Record<string, any> = {}
     const uniqueIds = Array.from(new Set(tasks.map((t) => extractWpId(t.rawUrl)).filter(Boolean))) as string[]
-    const details = await Promise.all(
-      uniqueIds.map((id) =>
-        api.get(`/api/v3/work_packages/${id}`, cookie).catch((e) => {
-          console.error(`[Export] 获取任务详情失败 (ID: ${id}):`, e)
-          return null
-        }),
-      ),
+    const details = await mapWithConcurrency(uniqueIds, DETAIL_CONCURRENCY, (id) =>
+      api.getWorkPackage(id, cookie).catch((e) => {
+        console.error(`[Export] 获取任务详情失败 (ID: ${id}):`, e)
+        return null
+      }),
     )
     for (let i = 0; i < uniqueIds.length; i++) {
       apiCache[uniqueIds[i]] = details[i]

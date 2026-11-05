@@ -1,26 +1,25 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \electron\services\apiClient.ts
  * @Description: OpenProject API 客户端，提供带 Cookie 鉴权的 GET / POST 请求
  */
-
-import { normalizeApiBaseUrl } from '@/utils/apiUrl'
 
 // #region 类型定义
 
 export interface ApiClient {
   get<T = any>(path: string, cookie: string): Promise<T>
   post<T = any>(path: string, cookie: string, body?: any): Promise<T>
+  getWorkPackage<T = any>(id: string, cookie: string): Promise<T>
 }
 
 // #endregion
 
 // #region 常量
 
-/** 单次请求的超时时间（毫秒），平台不可达时避免界面永久挂起 */
+// 单次请求的超时时间（毫秒），平台不可达时避免界面永久挂起
 const REQUEST_TIMEOUT = 15000
 
 // #endregion
@@ -34,10 +33,7 @@ const REQUEST_TIMEOUT = 15000
  * @returns {ApiClient} API 客户端对象
  */
 export function createApiClient(getBaseUrl: () => string): ApiClient {
-  const resolveBaseUrl = (): string => {
-    // 规范化后保留子路径
-    return normalizeApiBaseUrl(getBaseUrl())
-  }
+  const resolveBaseUrl = (): string => getBaseUrl().trim().replace(/\/+$/, '')
 
   return {
     /**
@@ -56,6 +52,11 @@ export function createApiClient(getBaseUrl: () => string): ApiClient {
       } catch {
         throw new Error(`响应解析失败 HTTP ${res.status}`)
       }
+    },
+
+    // 获取单个工作包详情
+    getWorkPackage<T = any>(id: string, cookie: string): Promise<T> {
+      return this.get<T>(`/api/v3/work_packages/${id}`, cookie)
     },
 
     /**

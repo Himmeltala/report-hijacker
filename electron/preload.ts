@@ -1,14 +1,14 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-07-13 00:26:38
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:45:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 09:20:00
  * @FilePath: \electron\preload.ts
  * @Description: 预加载脚本，通过 contextBridge 暴露 IPC 接口
  */
 import { contextBridge, ipcRenderer } from 'electron'
 
-/** 注册 IPC 事件监听，返回取消订阅函数 */
+// 注册 IPC 事件监听，返回取消订阅函数
 function subscribe(channel: string, callback: (...args: any[]) => void): () => void {
   const handler = (_e: any, ...args: any[]) => callback(...args)
   ipcRenderer.on(channel, handler)
@@ -69,7 +69,6 @@ contextBridge.exposeInMainWorld('electron', {
   syncHistoryTasks: (tasks: any[], cookie: string) => ipcRenderer.invoke('history:syncTasks', tasks, cookie),
   restoreHistoryFromDir: () => ipcRenderer.invoke('history:restoreFromDir'),
   backupNow: (dirs?: string[]) => ipcRenderer.invoke('history:backupNow', dirs),
-  migrateHistoryLayout: () => ipcRenderer.invoke('history:migrateLayout'),
   // #endregion
 
   // #region 用户档案管理

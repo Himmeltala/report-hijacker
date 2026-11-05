@@ -1,13 +1,11 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-03 10:00:00
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-03 10:00:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \src\utils\tag.ts
  * @Description: Element Plus Tag 颜色映射工具函数
  */
-
-import { normalizeApiBaseUrl } from '@/utils/apiUrl'
 
 // #region Tag 颜色映射
 
@@ -105,7 +103,7 @@ export const PAGE_SIZE_LIST = [15, 35, 55, 75, 95]
  * @returns {string} 完整任务链接
  */
 export function workPackageUrl(id: number, apiBaseUrl: string): string {
-  const base = normalizeApiBaseUrl(apiBaseUrl || 'https://xmgl.cdrunnet.com')
+  const base = (apiBaseUrl || 'https://xmgl.cdrunnet.com').trim().replace(/\/+$/, '')
   return `${base}/work_packages/${id}`
 }
 

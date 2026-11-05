@@ -20,13 +20,13 @@ export const TYPE_ORDER = ['缺陷', '任务']
 // #region 比较器
 
 export interface TaskOrderFields {
-  /** 平台状态名，取不到时排最后 */
+  // 平台状态名，取不到时排最后
   status?: string
-  /** 平台类型名，取不到时排最后 */
+  // 平台类型名，取不到时排最后
   type?: string
-  /** 日期（YYYY-MM-DD 或 ISO），同日按序号排 */
+  // 日期（YYYY-MM-DD 或 ISO），同日按序号排
   date?: string
-  /** 组内序号 */
+  // 组内序号
   seq?: number
 }
 

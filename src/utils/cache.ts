@@ -44,8 +44,4 @@ export function removeCache(key: string): void {
   store.delete(key)
 }
 
-export function clearAllCache(): void {
-  store.clear()
-}
-
 // #endregion

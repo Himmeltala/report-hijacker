@@ -1,11 +1,10 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-07-12 01:46:20
- * Description: 应用入口
+ * @Date: 2026-11-04 10:28:53
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-07-14 12:14:04
- * @FilePath: \..\\src\\main.ts
- * @Description: 描述
+ * @LastEditTime: 2026-11-05 10:20:09
+ * @FilePath: /pros/self/task-manager/src/main.ts
+ * @Description: 应用入口
  */
 
 import { createApp } from 'vue'

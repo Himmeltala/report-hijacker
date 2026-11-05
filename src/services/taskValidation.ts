@@ -28,35 +28,35 @@ export interface TaskToValidate {
 export interface ValidateConfig {
   cookie: string
   handlerName: string
-  /** 设置中的所属部门，AI 审查比对用 */
+  // 设置中的所属部门，AI 审查比对用
   departmentName?: string
-  /** 是否执行 AI 审查（只拉取平台数据时省略） */
+  // 是否执行 AI 审查（只拉取平台数据时省略）
   aiEnabled?: boolean
 }
 
 export interface TaskReviewOutcome {
-  /** 原数组索引，批量中止时后续索引缺失 */
+  // 原数组索引，批量中止时后续索引缺失
   index: number
-  /** 平台任务详情，取数异常时为 null */
+  // 平台任务详情，取数异常时为 null
   result: TaskDetailResult | null
-  /** AI 审查结论，未启用 AI 审查时为 null */
+  // AI 审查结论，未启用 AI 审查时为 null
   aiConclusion: string | null
-  /** AI 审查实际发送的提示词，未执行时为 undefined */
+  // AI 审查实际发送的提示词，未执行时为 undefined
   aiPrompt?: string
-  /** 推理模型的思考过程，非推理模型为空 */
+  // 推理模型的思考过程，非推理模型为空
   aiReasoning?: string
-  /** AI 审查异常信息 */
+  // AI 审查异常信息
   aiError?: string
-  /** 取数异常信息 */
+  // 取数异常信息
   error?: Error
 }
 
 export interface ValidateBatchOptions {
-  /** 外部中止信号 */
+  // 外部中止信号
   signal?: { aborted: boolean }
-  /** 每条任务开始时回调，用于输出进度日志 */
+  // 每条任务开始时回调，用于输出进度日志
   onTaskStart?: (index: number, total: number, task: TaskToValidate) => void
-  /** 每条任务完成时立即回调，用于逐条输出结果日志 */
+  // 每条任务完成时立即回调，用于逐条输出结果日志
   onTaskComplete?: (outcome: TaskReviewOutcome) => void
 }
 
@@ -78,13 +78,13 @@ function extractCommentText(activities: any): string {
 // 任务审查模块提示词设置键（提示词按模块独立配置，连接配置统一全局）
 const TASK_REVIEW_PROMPT_KEY = 'ai.taskReview.prompt'
 
-/** 今天日期，YYYY-MM-DD */
+// 今天日期，YYYY-MM-DD
 function todayText(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** 时长字段转小时文本，空值返回空字符串 */
+// 时长字段转小时文本，空值返回空字符串
 function hoursText(raw: any): string {
   if (raw === undefined || raw === null || raw === '') return ''
   return String(convertIso8601ToHours(String(raw)))

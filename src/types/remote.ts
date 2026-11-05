@@ -59,31 +59,3 @@ export interface RawWorkPackage {
 export type ReadonlyRawWorkPackage = DeepReadonly<RawWorkPackage>
 
 // #endregion
-
-// #region 通知类型
-
-/**
- * OpenProject 通知元素原始响应，仅声明消费到的字段
- */
-export interface RawNotificationElement {
-  _type: string
-  id: number
-  readIAN: boolean
-  reason: string
-  createdAt: string
-  updatedAt: string
-  _embedded: {
-    details: Array<{
-      format: string
-      raw: string
-      html: string
-    }>
-  }
-  _links: Record<string, any>
-  [key: string]: any
-}
-
-/** 只读通知元素 */
-export type ReadonlyRawNotificationElement = DeepReadonly<RawNotificationElement>
-
-// #endregion

@@ -1,15 +1,16 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-04
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \electron\utils.ts
  * @Description: Electron 主进程通用工具函数
  */
 
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { readFile } from 'fs/promises'
-import { join } from 'path'
+import { dirname } from 'path'
+import type { BrowserWindow } from 'electron'
 
 // #region 文件路径工具
 
@@ -40,6 +41,14 @@ export async function readJsonFileAsync<T>(filePath: string, fallback: T): Promi
   }
 }
 
+// 原子写入 JSON 文件：先写临时文件再重命名，崩溃时不会留下截断文件
+export function writeJsonAtomic(filePath: string, data: any, indent = 2): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+  const tmpPath = `${filePath}.tmp`
+  writeFileSync(tmpPath, JSON.stringify(data, null, indent), 'utf-8')
+  renameSync(tmpPath, filePath)
+}
+
 /** 列出目录中所有 .json 文件，返回完整文件名 */
 export function listJsonFiles(dir: string): string[] {
   if (!existsSync(dir)) return []
@@ -53,28 +62,6 @@ export function listJsonFiles(dir: string): string[] {
 /** 列出目录中所有 .json 文件，返回去除扩展名的文件名 */
 export function listJsonBasenames(dir: string): string[] {
   return listJsonFiles(dir).map((f) => f.replace('.json', ''))
-}
-
-/** 递归列出目录下所有 .json 文件，返回相对于 dir 的路径，层级用 / 连接 */
-export function listJsonFilesRecursive(dir: string): string[] {
-  const results: string[] = []
-  let entries
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return results
-  }
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      for (const sub of listJsonFilesRecursive(join(dir, entry.name))) {
-        results.push(join(entry.name, sub))
-      }
-    } else if (entry.isFile() && entry.name.endsWith('.json')) {
-      results.push(entry.name)
-    }
-  }
-  return results
 }
 
 // #endregion
@@ -106,6 +93,17 @@ export function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return dateStr
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+// #endregion
+
+// #region 窗口事件
+
+// 向渲染进程发送事件，窗口不存在或已销毁时静默跳过
+export function sendToWindow(getWindow: () => BrowserWindow | null, channel: string, ...args: any[]): void {
+  const win = getWindow()
+  if (!win || win.isDestroyed()) return
+  win.webContents.send(channel, ...args)
 }
 
 // #endregion

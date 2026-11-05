@@ -1,22 +1,22 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-09-24
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-09-24
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \electron\services\historyPaths.ts
  * @Description: 历史目录布局：日期校验、年月分层路径与日期枚举
  */
 
-import { readdirSync, rmdirSync, statSync } from 'fs'
+import { readdirSync, rmdirSync } from 'fs'
 import type { Dirent } from 'fs'
-import { basename, join } from 'path'
+import { join } from 'path'
 
-/** 历史日期文件名的合法格式（防止路径注入） */
+// 历史日期文件名的合法格式（防止路径注入）
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 const YEAR_DIR_PATTERN = /^\d{4}$/
 
-/** 月目录名格式，月份补零，保证按字符串排序与真实月份一致 */
+// 月目录名格式，月份补零，保证按字符串排序与真实月份一致
 const MONTH_DIR_PATTERN = /^\d{2}$/
 
 /**
@@ -127,87 +127,4 @@ export function pruneEmptyDateDirs(historyDir: string, date: string): void {
   } catch {
     // 年份目录下还有别的月份
   }
-}
-
-/** 恢复备份时，同一日期在源目录里的一份候选文件 */
-interface RestoreCandidate {
-  /** 相对源目录的路径 */
-  relPath: string
-  /** 文件修改时间（毫秒） */
-  mtimeMs: number
-  /** 是否位于 年/月 子目录下 */
-  layered: boolean
-}
-
-/** 恢复备份时，按日期挑出来的唯一来源 */
-export interface RestorePick {
-  /** 每个日期的来源文件，按日期升序排列 */
-  sources: Array<{ date: string; relPath: string }>
-  /** 源目录里存在多份来源的日期个数 */
-  conflictCount: number
-}
-
-/**
- * 判断相对路径是否正好落在该日期的 年/月 子目录下
- * @param {string} relPath 相对源目录的路径
- * @param {string} date 日期字符串（YYYY-MM-DD）
- */
-function isLayeredPath(relPath: string, date: string): boolean {
-  return relPath === join(date.slice(0, 4), date.slice(5, 7), `${date}.json`)
-}
-
-/**
- * 比较两份候选文件，返回正数表示 a 更优先
- * 保证结果不随目录读取顺序变化
- * @param {RestoreCandidate} a 候选文件甲
- * @param {RestoreCandidate} b 候选文件乙
- */
-function compareCandidates(a: RestoreCandidate, b: RestoreCandidate): number {
-  if (a.mtimeMs !== b.mtimeMs) return a.mtimeMs - b.mtimeMs
-  if (a.layered !== b.layered) return a.layered ? 1 : -1
-  return a.relPath.localeCompare(b.relPath)
-}
-
-/**
- * 从源目录的文件列表中为每个日期挑出唯一来源
- * 备份目录可能同一日期同时存在平铺与分层两份文件，不挑拣则恢复结果不稳定
- * @param {string} srcDir 源目录
- * @param {string[]} relPaths 相对源目录的 .json 文件路径列表
- */
-export function pickRestoreSources(srcDir: string, relPaths: string[]): RestorePick {
-  const best = new Map<string, RestoreCandidate>()
-  const conflicted = new Set<string>()
-
-  for (const relPath of relPaths) {
-    const date = basename(relPath).replace(/\.json$/, '')
-    if (!isValidDate(date)) {
-      console.warn('[History] 跳过非日期命名的文件:', relPath)
-      continue
-    }
-    let mtimeMs: number
-    try {
-      mtimeMs = statSync(join(srcDir, relPath)).mtimeMs
-    } catch (e) {
-      console.warn('[History] 跳过读不到的文件:', relPath, e)
-      continue
-    }
-    const candidate: RestoreCandidate = { relPath, mtimeMs, layered: isLayeredPath(relPath, date) }
-    const previous = best.get(date)
-    if (!previous) {
-      best.set(date, candidate)
-      continue
-    }
-    const winner = compareCandidates(candidate, previous) > 0 ? candidate : previous
-    const loser = winner === candidate ? previous : candidate
-    console.warn(`[History] ${date} 在源目录里有多份，取 ${winner.relPath}，忽略 ${loser.relPath}`)
-    conflicted.add(date)
-    best.set(date, winner)
-  }
-
-  const sources: Array<{ date: string; relPath: string }> = []
-  best.forEach((candidate, date) => {
-    sources.push({ date, relPath: candidate.relPath })
-  })
-  sources.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-  return { sources, conflictCount: conflicted.size }
 }

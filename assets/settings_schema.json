@@ -17,8 +17,8 @@
             "key": "connection.apiBaseUrl",
             "label": "API 地址",
             "type": "text",
-            "default": "https://xmgl.cdrunnet.com/api/v3/work_packages",
-            "description": "任务管理平台 API 基础地址"
+            "default": "https://xmgl.cdrunnet.com",
+            "description": "任务管理平台站点根地址，如 https://xmgl.cdrunnet.com"
           }
         ]
       }
@@ -36,7 +36,6 @@
             "label": "处理人",
             "type": "text",
             "default": "",
-            "compareCandidate": true,
             "description": "任务处理人名称，用于 AI 审查比对和导出文件名"
           },
           {
@@ -44,7 +43,6 @@
             "label": "所属部门",
             "type": "text",
             "default": "",
-            "compareCandidate": true,
             "description": "任务所属部门名称，用于 AI 审查比对"
           }
         ]
@@ -354,28 +352,25 @@
         "label": "更新设置",
         "settings": [
           {
-            "key": "update.enabled",
-            "label": "启用自动检查",
-            "type": "checkbox",
-            "default": true,
-            "description": "开启后按下面的间隔自动检查新版本；关闭后仍可在本页底部手动检查"
-          },
-          {
-            "key": "update.mode",
-            "label": "检查方式",
+            "key": "update.frequency",
+            "label": "更新频率",
             "type": "combo",
-            "default": "share",
+            "default": "interval",
             "options": [
               {
-                "label": "共享盘目录",
-                "value": "share"
+                "label": "定时检查",
+                "value": "interval"
               },
               {
-                "label": "更新接口",
-                "value": "http"
+                "label": "启动后检查",
+                "value": "startup"
+              },
+              {
+                "label": "关闭自动更新",
+                "value": "off"
               }
             ],
-            "description": "共享盘方式从目录读取安装包并比对 MD5；接口方式调用更新接口下载安装包"
+            "description": "定时检查按下面的间隔执行；启动后检查只在程序启动后检查一次；关闭后不再自动检查，仍可在本页底部手动检查"
           },
           {
             "key": "update.intervalHours",
@@ -386,18 +381,26 @@
             "max": 168,
             "step": 1,
             "suffix": "小时",
-            "depends_on": "update.enabled",
-            "depends_value": true,
-            "description": "自动检查的间隔小时数，最小 1 小时"
+            "depends_on": "update.frequency",
+            "depends_value": "interval",
+            "description": "定时检查的间隔小时数，最小 1 小时"
           },
           {
-            "key": "update.checkOnStartup",
-            "label": "启动时检查",
-            "type": "checkbox",
-            "default": true,
-            "depends_on": "update.enabled",
-            "depends_value": true,
-            "description": "程序启动后稍等片刻检查一次更新"
+            "key": "update.mode",
+            "label": "更新方式",
+            "type": "combo",
+            "default": "http",
+            "options": [
+              {
+                "label": "更新接口",
+                "value": "http"
+              },
+              {
+                "label": "共享盘目录",
+                "value": "share"
+              }
+            ],
+            "description": "更新接口从服务下载安装包；共享盘目录直接读取目录里的安装包并比对 MD5"
           },
           {
             "key": "update.sharePath",
@@ -412,7 +415,7 @@
             "key": "update.apiUrl",
             "label": "更新接口",
             "type": "text",
-            "default": "http://11.1.1.184/manager/check-update",
+            "default": "http://11.1.1.184:3000/api/update/check",
             "depends_on": "update.mode",
             "depends_value": "http",
             "description": "接口返回 JSON：{version, url, md5, notes}，url 为相对路径时按接口地址补全"

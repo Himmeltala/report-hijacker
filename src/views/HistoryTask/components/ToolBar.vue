@@ -90,17 +90,17 @@ export interface ToolbarState {
   pageCount: number
   rangeCount: number
   totalCount: number
-  /** 同步中；同步后接检查期间也为真 */
+  // 同步中；同步后接检查期间也为真
   syncing: boolean
-  /** 审查中；同步后接审查期间也为真 */
+  // 审查中；同步后接审查期间也为真
   checking: boolean
   exporting: boolean
   backingUp: boolean
   autoSyncEnabled: boolean
-  /** 上次同步时间展示文本 */
+  // 上次同步时间展示文本
   lastSyncTime: string
   backupEnabled: boolean
-  /** 上次备份时间展示文本 */
+  // 上次备份时间展示文本
   lastBackupTime: string
 }
 </script>

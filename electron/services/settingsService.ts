@@ -1,127 +1,22 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-08-04
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:30:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-05 10:45:00
  * @FilePath: \electron\services\settingsService.ts
  * @Description: 设置服务：schema 驱动的默认值构建、JSON 持久化及设置 IPC
  */
 
-import { ipcMain, dialog, BrowserWindow } from 'electron'
-import { dirname, join } from 'path'
-import { existsSync, writeFileSync, readFileSync, rmSync, mkdirSync } from 'fs'
-import { readJsonFile, listJsonBasenames } from '@electron/utils'
+import { ipcMain } from 'electron'
+import type { BrowserWindow } from 'electron'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { readJsonFile, sendToWindow, writeJsonAtomic } from '@electron/utils'
+import { pickOpenPath, pickSavePath } from '@electron/services/fileService'
 
 // #region 常量
 
-/** 导出设置时 Cookie 的脱敏占位值，导入时识别该值并跳过，保留当前 Cookie */
+// 导出设置时 Cookie 的脱敏占位值，导入时识别该值并跳过，保留当前 Cookie
 const COOKIE_MASK = '******'
-
-/** 历史版本的任务审查默认提示词：设置里仍是旧默认值时升级为当前默认，用户自己改过的不动 */
-const LEGACY_TASK_REVIEW_PROMPTS = [
-  `你是任务完成情况审查员。根据以下任务信息审查任务是否已按要求完成，只输出审查结论文本。
-
-任务标题：{title}
-任务状态：{status}
-任务类型：{type}
-任务描述：
-{description}
-
-评论区内容：
-{comments}
-
-要求：
-1. 只输出审查结论，不超过 30 字，不要输出其他任何内容。
-2. 发现问题时直接指出问题本身，例如：代码未提交、评论未说明完成情况、缺少成果形式。
-3. 未发现明显问题时输出：审查通过。`,
-  `你是任务完成情况审查员。审查下面这条任务是否已按要求完成，只输出审查结论。
-
-任务信息：
-任务标题：{title}
-任务状态：{status}
-任务类型：{type}
-任务日期：{date}
-今天日期：{today}
-处理人（任务）：{responsible}
-处理人（设置预期）：{expectedHandler}
-所属部门（任务）：{department}
-所属部门（设置预期）：{expectedDepartment}
-自评时长（小时）：{selfHours}
-预估时长（小时）：{estimateHours}
-
-任务描述：
-{description}
-
-评论区内容：
-{comments}
-
-审查标准：
-一、任务描述是否写清四部分
-1. 是什么：前提条件、成果形式、边界三项都要有。缺哪项就指出，并依据「干什么」给出补充建议。
-2. 干什么：要做的事是否表达清楚；模棱两可或与标题不符时指出。
-3. 怎么检查：检查内容是否齐全；按任务内容补充应该覆盖的测试用例建议。
-4. 怎么做：是否包含流程图与做法步骤；从描述里提取关键步骤，缺失时给出建议。
-二、任务属性
-5. 处理人是否与设置中的处理人一致，所属部门是否与设置中的所属部门一致；设置中的处理人或所属部门为空时跳过对应比对。
-6. 自评时长不得超过预估时长 1.5 小时，超出时报问题（自评减预估大于 1.5 小时才算异常）。
-7. 任务日期是否在今天范围内；任务日期为空时跳过此项。
-三、评论区
-8. 是否说明完成情况，是否有代码提交记录与成果物（截图、文档、链接等）提交信息，缺失时指出。
-
-输出要求：
-1. 只输出审查结论，可以分条列出，不再限制字数。
-2. 未发现明显问题时输出「审查通过」。
-3. 发现问题时逐条列出问题，并对可补充内容给出具体建议，例如补充前提条件、成果形式、边界、测试用例、做法步骤。
-4. 任务类型为缺陷时跳过「一」的描述完整性审查，只审查任务属性与评论区。`,
-  `你是任务完成情况审查员。审查下面这条任务是否已按要求完成。
-
-任务信息：
-任务标题：{title}
-任务状态：{status}
-任务类型：{type}
-任务日期：{date}
-今天日期：{today}
-处理人（任务）：{responsible}
-处理人（设置预期）：{expectedHandler}
-所属部门（任务）：{department}
-所属部门（设置预期）：{expectedDepartment}
-自评时长（小时）：{selfHours}
-预估时长（小时）：{estimateHours}
-
-任务描述：
-{description}
-
-评论区内容：
-{comments}
-
-阅读说明：
-1. 上下文里的 [图片] 或 [图片:说明] 是平台图片占位，表示该位置已有截图、流程图或成果物，不得因为看不到图片内容而判定为缺失。
-2. 任务描述里的表格常带模板默认空行，空白行不算缺失，只按已填写的行判断。
-3. 显示为 (空) 的项表示平台上该项为空。
-
-审查标准：
-一、任务描述是否写清四部分
-1. 是什么：前提条件、成果形式、边界三项都要有。缺哪项就指出，并依据「干什么」直接给出补充文本。
-2. 干什么：要做的事是否表达清楚；模棱两可或与标题不符时指出。
-3. 怎么检查：检查内容是否齐全；按任务内容补充应该覆盖的测试用例建议。
-4. 怎么做：是否包含流程图与做法步骤；从描述里提取关键步骤，缺失时给出建议。
-二、任务属性
-5. 处理人是否与设置中的处理人一致，所属部门是否与设置中的所属部门一致；设置中的处理人或所属部门为空时跳过对应比对。
-6. 自评时长不得超过预估时长 1.5 小时，超出时报问题（自评减预估大于 1.5 小时才算异常）。
-7. 任务日期是否在今天范围内；任务日期为空时跳过此项。
-三、评论区
-8. 是否说明完成情况，是否有代码提交记录与成果物（截图、文档、链接等）提交信息，缺失时指出。
-
-输出要求：
-1. 第一行固定输出「任务标题：」加任务标题原文，不要改动标题。
-2. 未发现明显问题时，第二行只输出「审查通过」，不再输出其他内容。
-3. 发现问题时，每条问题单独成段，格式为：
-- 问题N【所属部分】：问题描述
-  建议：直接给出可以粘贴到任务里的内容，不要写「建议补充」这类空话。
-4. 「所属部分」取「是什么」「干什么」「怎么检查」「怎么做」「任务属性」「评论区」之一。
-5. 不要输出思考过程、已通过项、总结和审查标准原文。
-6. 任务类型为缺陷时跳过「一」的描述完整性审查，只审查任务属性与评论区。`,
-]
 
 // #endregion
 
@@ -134,7 +29,6 @@ export class AppSettings {
   private path: string
   private schemaPath: string
   private data: Record<string, any> = {}
-  private schemaDefaults: Record<string, any> = {}
 
   constructor(settingsPath: string, schemaPath: string) {
     this.path = settingsPath
@@ -147,7 +41,6 @@ export class AppSettings {
 
   private buildDefaults(): void {
     this.data = {}
-    this.schemaDefaults = {}
     if (!existsSync(this.schemaPath)) return
     try {
       const schema = JSON.parse(readFileSync(this.schemaPath, 'utf-8'))
@@ -155,7 +48,6 @@ export class AppSettings {
         for (const group of cat.groups || []) {
           for (const setting of group.settings || []) {
             if (setting.default !== undefined && setting.default !== null) {
-              this.schemaDefaults[setting.key] = setting.default
               this.setNested(setting.key, setting.default)
             }
           }
@@ -166,7 +58,7 @@ export class AppSettings {
     }
   }
 
-  /** 按点号路径写入嵌套值 */
+  // 按点号路径写入嵌套值
   private setNested(key: string, value: any): void {
     const parts = key.split('.')
     let d = this.data
@@ -198,20 +90,9 @@ export class AppSettings {
     try {
       const loaded = JSON.parse(readFileSync(this.path, 'utf-8'))
       this.deepMerge(this.data, loaded)
-      this.upgradeLegacyTaskReviewPrompt()
     } catch (e) {
       console.error('[Settings] 读取设置文件失败:', e)
     }
-  }
-
-  /** 旧版任务审查默认提示词升级：只替换仍是旧默认值的配置，用户改过的不动 */
-  private upgradeLegacyTaskReviewPrompt(): void {
-    const current = this.data?.ai?.taskReview?.prompt
-    const next = this.schemaDefaults['ai.taskReview.prompt']
-    if (typeof current !== 'string' || typeof next !== 'string') return
-    if (!LEGACY_TASK_REVIEW_PROMPTS.includes(current.trim())) return
-    this.data.ai.taskReview.prompt = next
-    this.save()
   }
 
   // #endregion
@@ -219,8 +100,7 @@ export class AppSettings {
   // #region 公共方法
 
   save(): void {
-    mkdirSync(dirname(this.path), { recursive: true })
-    writeFileSync(this.path, JSON.stringify(this.data, null, 2), 'utf-8')
+    writeJsonAtomic(this.path, this.data, 2)
   }
 
   /**
@@ -279,22 +159,20 @@ export class AppSettings {
 // #region IPC 注册
 
 /**
- * 注册设置与通用存储 IPC
+ * 注册设置 IPC
  * @param {object} deps 依赖项
  * @param {() => AppSettings} deps.getSettings 获取当前设置实例（档案切换后可能被替换）
- * @param {BrowserWindow | null} deps.mainWindow 主窗口
- * @param {() => string} deps.getStoreDir 获取通用存储目录
+ * @param {() => BrowserWindow | null} deps.getWindow 获取主窗口
  * @param {() => void} deps.onBackupSettingChanged 备份设置变更回调
  */
 export function setupSettingsIpc(deps: {
   getSettings: () => AppSettings
-  mainWindow: BrowserWindow | null
-  getStoreDir: () => string
+  getWindow: () => BrowserWindow | null
   onBackupSettingChanged: () => void
-  /** 更新设置变更后的回调，用于重建更新检查定时器 */
+  // 更新设置变更后的回调，用于重建更新检查定时器
   onUpdateSettingChanged?: () => void
 }): void {
-  const { getSettings, mainWindow, getStoreDir, onBackupSettingChanged, onUpdateSettingChanged } = deps
+  const { getSettings, getWindow, onBackupSettingChanged, onUpdateSettingChanged } = deps
 
   // #region 设置读写
 
@@ -321,14 +199,14 @@ export function setupSettingsIpc(deps: {
   ipcMain.handle('settings:set', (_e, key, value) => {
     getSettings().set(key, value)
     if (key === 'appearance.theme' || key === 'theme') {
-      mainWindow?.webContents.send('event:themeChanged', value)
+      sendToWindow(getWindow, 'event:themeChanged', value)
     }
     if (key.startsWith('history.backup')) {
       onBackupSettingChanged()
     }
     // 自动同步设置变更后通知渲染进程重启定时器，无需重启或重新进页才能生效
     if (key.startsWith('history.autoSync')) {
-      mainWindow?.webContents.send('event:autoSyncSettingsChanged')
+      sendToWindow(getWindow, 'event:autoSyncSettingsChanged')
     }
     // 更新设置变更后立即重建更新检查定时器
     if (key.startsWith('update.')) {
@@ -348,12 +226,12 @@ export function setupSettingsIpc(deps: {
   // #region 设置导入导出
 
   ipcMain.handle('settings:export', async () => {
-    const filePath = await dialog.showSaveDialog({
+    const filePath = await pickSavePath(getWindow, {
       title: '导出设置',
       defaultPath: `settings-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     })
-    if (filePath.canceled || !filePath.filePath) return { success: false }
+    if (!filePath) return { success: false }
     // 深拷贝后脱敏，避免掩码值写回当前配置被持久化
     const data = JSON.parse(JSON.stringify(getSettings().exportData()))
     // 导出时对 Cookie 脱敏，避免设置文件泄露平台账号凭证
@@ -364,17 +242,17 @@ export function setupSettingsIpc(deps: {
     if (data.ai && typeof data.ai === 'object' && data.ai.apiKey) {
       data.ai = { ...data.ai, apiKey: COOKIE_MASK }
     }
-    writeFileSync(filePath.filePath, JSON.stringify(data, null, 2), 'utf-8')
-    return { success: true, filePath: filePath.filePath }
+    writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+    return { success: true, filePath }
   })
   ipcMain.handle('settings:import', async () => {
-    const filePath = await dialog.showOpenDialog({
+    const filePath = await pickOpenPath(getWindow, {
       title: '导入设置',
       filters: [{ name: 'JSON', extensions: ['json'] }],
       properties: ['openFile'],
     })
-    if (filePath.canceled || !filePath.filePaths?.[0]) return null
-    const raw = readFileSync(filePath.filePaths[0], 'utf-8')
+    if (!filePath) return null
+    const raw = readFileSync(filePath, 'utf-8')
     let data: any
     try {
       data = JSON.parse(raw)
@@ -403,34 +281,13 @@ export function setupSettingsIpc(deps: {
     }
     // 自动同步设置变更后通知渲染进程重启定时器
     if (entries.some(([key]) => key.startsWith('history.autoSync'))) {
-      mainWindow?.webContents.send('event:autoSyncSettingsChanged')
+      sendToWindow(getWindow, 'event:autoSyncSettingsChanged')
     }
     // 主题配置变更后通知渲染进程刷新
     if (data.appearance && typeof data.appearance === 'object' && data.appearance.theme !== undefined) {
-      mainWindow?.webContents.send('event:themeChanged', data.appearance.theme)
+      sendToWindow(getWindow, 'event:themeChanged', data.appearance.theme)
     }
     return { success: true }
-  })
-
-  // #endregion
-
-  // #region 通用数据存储
-
-  ipcMain.handle('store:get', (_e, key: string) => {
-    const filePath = join(getStoreDir(), `${key}.json`)
-    return readJsonFile(filePath, null)
-  })
-  ipcMain.handle('store:set', (_e, key: string, value: any) => {
-    if (value === undefined) throw new Error('store:set 不支持 undefined 值')
-    const filePath = join(getStoreDir(), `${key}.json`)
-    writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf-8')
-  })
-  ipcMain.handle('store:delete', (_e, key: string) => {
-    const filePath = join(getStoreDir(), `${key}.json`)
-    if (existsSync(filePath)) rmSync(filePath)
-  })
-  ipcMain.handle('store:keys', () => {
-    return listJsonBasenames(getStoreDir())
   })
 
   // #endregion

@@ -17,14 +17,14 @@ export interface TaskItem {
   rawSeq: string
   rawEstimatedHours: string
   rawProjectName: string
-  /** 任务标题（含备注） */
+  // 任务标题（含备注）
   rawTitle: string
-  /** 处理人（从标题或备注末尾提取） */
+  // 处理人（从标题或备注末尾提取）
   rawHandler: string
-  /** 备注（第一个【】内的内容） */
+  // 备注（第一个【】内的内容）
   rawRemark: string
   rawUrl: string
-  /** 工时或分数 */
+  // 工时或分数
   rawScore: string
   rawText: string
 }
@@ -36,9 +36,9 @@ export interface TaskItem {
 /** 从平台拉取的任务详情，ser 前缀为服务与平台侧字段 */
 export interface TaskDetailResult {
   serTaskId: string
-  /** 远程原始数据，只读，平台字段原封不动 */
+  // 远程原始数据，只读，平台字段原封不动
   remote?: ReadonlyRawWorkPackage
-  /** 取数或请求异常信息 */
+  // 取数或请求异常信息
   serError?: string
 }
 

@@ -12,7 +12,7 @@ import { ElMessageBox } from 'element-plus'
 import { useLogStore } from '@/stores/log.store'
 import type { UpdateCheckResult, UpdateProgress, UpdateStatus } from '@/types/update'
 
-/** 转义 HTML：更新说明来自接口或文件名，弹窗按 HTML 渲染前先转义 */
+// 转义 HTML：更新说明来自接口或文件名，弹窗按 HTML 渲染前先转义
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -28,7 +28,7 @@ export function useUpdater() {
   const applying = ref(false)
   const progress = ref<UpdateProgress | null>(null)
 
-  /** 读取当前版本与上次检查时间 */
+  // 读取当前版本与上次检查时间
   async function loadStatus(): Promise<void> {
     try {
       status.value = await window.electron.getUpdateStatus()
