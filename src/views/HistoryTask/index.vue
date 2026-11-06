@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 08:54:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 11:22:00
+ * @LastEditTime: 2026-11-06 11:52:00
  * @FilePath: \src\views\HistoryTask\index.vue
  * @Description: 历史任务页面
 -->
@@ -1192,8 +1192,9 @@ function buildCheckNotifyBody(passed: number, failed: number, total: number): st
   return body
 }
 
-async function handleAiReviewSelected() {
-  const tasks = selection.value
+// 同步会重建列表并触发 el-table 清空勾选，勾选任务要在同步前取快照传给这里
+async function handleAiReviewSelected(tasksSnapshot?: HistoryTaskItem[]) {
+  const tasks = tasksSnapshot ?? selection.value
   if (!tasks.length) return
   checking.value = true
   abortCheck.value = false
@@ -1608,11 +1609,13 @@ function handleSyncCheckCmd(cmd: string) {
 
 // 先同步再 AI 审查，同步被停止时不再继续审查
 async function handleSyncThenAiReview(byRange: boolean) {
+  // 同步完成必然重建表格，el-table 会清空勾选，选中任务必须在同步前记下来
+  const tasksSnapshot = byRange ? [] : [...selection.value]
   if (byRange) await handleSyncAll()
   else await handleSync()
   if (abortSync.value) return
   if (byRange) await handleAiReviewRange()
-  else await handleAiReviewSelected()
+  else await handleAiReviewSelected(tasksSnapshot)
 }
 
 function handleExportCmd(cmd: string) {
