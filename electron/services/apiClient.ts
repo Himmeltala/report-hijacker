@@ -2,17 +2,23 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-04
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:45:00
+ * @LastEditTime: 2026-11-06 08:50:00
  * @FilePath: \electron\services\apiClient.ts
  * @Description: OpenProject API 客户端，提供带 Cookie 鉴权的 GET / POST 请求
  */
 
 // #region 类型定义
 
+// 单次请求可选参数
+export interface ApiRequestOptions {
+  // 覆盖默认超时（毫秒）
+  timeoutMs?: number
+}
+
 export interface ApiClient {
-  get<T = any>(path: string, cookie: string): Promise<T>
-  post<T = any>(path: string, cookie: string, body?: any): Promise<T>
-  getWorkPackage<T = any>(id: string, cookie: string): Promise<T>
+  get<T = any>(path: string, cookie: string, options?: ApiRequestOptions): Promise<T>
+  post<T = any>(path: string, cookie: string, body?: any, options?: ApiRequestOptions): Promise<T>
+  getWorkPackage<T = any>(id: string, cookie: string, options?: ApiRequestOptions): Promise<T>
 }
 
 // #endregion
@@ -41,10 +47,10 @@ export function createApiClient(getBaseUrl: () => string): ApiClient {
      * @param {string} path 请求路径（含 /api/v3 前缀）
      * @param {string} cookie 登录 Cookie
      */
-    async get<T = any>(path: string, cookie: string): Promise<T> {
+    async get<T = any>(path: string, cookie: string, options?: ApiRequestOptions): Promise<T> {
       const res = await fetch(`${resolveBaseUrl()}${path}`, {
         headers: { Cookie: cookie, 'X-Requested-With': 'XMLHttpRequest' },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+        signal: AbortSignal.timeout(options?.timeoutMs ?? REQUEST_TIMEOUT),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       try {
@@ -55,8 +61,8 @@ export function createApiClient(getBaseUrl: () => string): ApiClient {
     },
 
     // 获取单个工作包详情
-    getWorkPackage<T = any>(this: ApiClient, id: string, cookie: string): Promise<T> {
-      return this.get<T>(`/api/v3/work_packages/${id}`, cookie)
+    getWorkPackage<T = any>(this: ApiClient, id: string, cookie: string, options?: ApiRequestOptions): Promise<T> {
+      return this.get<T>(`/api/v3/work_packages/${id}`, cookie, options)
     },
 
     /**

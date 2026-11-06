@@ -2,7 +2,7 @@
  * @Author: Himmeltala
  * @Date: 2026-11-05 10:30:00
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:40:00
+ * @LastEditTime: 2026-11-06 08:50:00
  * @FilePath: \electron\services\openProjectService.ts
  * @Description: OpenProject 取数服务：任务详情、评论区与平台通知 IPC
  */
@@ -14,10 +14,21 @@ import { extractWpId } from '@electron/utils'
 import { mapWithConcurrency } from '@electron/concurrency'
 
 // 工作包详情补全请求的并发上限，防止大批量通知打爆平台接口
-const DETAIL_CONCURRENCY = 5
+const DETAIL_CONCURRENCY = 10
+
+// 通知列表请求超时：列表带过滤条件时平台偶发慢响应，按单次请求 15 秒算太容易整体超时
+const LIST_TIMEOUT_MS = 60_000
+
+// 单条工作包详情超时：超时按取数失败处理（退回通知自带字段），不让个别慢请求拖垮整页
+const DETAIL_TIMEOUT_MS = 10_000
 
 // 逐条标记已读的并发上限
 const MARK_READ_CONCURRENCY = 5
+
+// 判断是否为请求超时（AbortSignal.timeout 抛 TimeoutError）
+function isTimeoutError(e: any): boolean {
+  return e?.name === 'TimeoutError' || /aborted due to timeout|timeout/i.test(String(e?.message || ''))
+}
 
 // 逐条标记已读：这套部署的集合接口 read_ian 不可用，定向标记只能走单条
 async function markOneRead(api: ApiClient, id: number, cookie: string): Promise<void> {
@@ -70,10 +81,18 @@ export function setupOpenProjectIpc(api: ApiClient): void {
     if (onlyUnread) {
       filters = encodeURIComponent(JSON.stringify([{ readIAN: { operator: '=', values: ['f'] } }]))
     }
-    const data: any = await api.get(
-      `/api/v3/notifications?pageSize=${pageSize}&offset=${offset}&filters=${filters}`,
-      cookie,
-    )
+    // 列表请求放宽超时，超时时给出明确提示，避免整条 IPC 抛原始 TimeoutError
+    let data: any
+    try {
+      data = await api.get(
+        `/api/v3/notifications?pageSize=${pageSize}&offset=${offset}&filters=${filters}`,
+        cookie,
+        { timeoutMs: LIST_TIMEOUT_MS },
+      )
+    } catch (e: any) {
+      if (isTimeoutError(e)) throw new Error('通知列表请求超时（60 秒），平台响应较慢，请稍后重试')
+      throw e
+    }
 
     // 提取工作包 ID，不写入原始元素
     const elements = data._embedded?.elements || []
@@ -89,9 +108,9 @@ export function setupOpenProjectIpc(api: ApiClient): void {
     const wpMap: Record<string, any> = {}
     if (wpIdSet.size > 0) {
       const ids = Array.from(wpIdSet)
-      // 限并发获取工作包详情，避免触发平台限流
+      // 限并发获取工作包详情，避免触发平台限流；单条超时快速失败，不拖慢整页
       const details = await mapWithConcurrency(ids, DETAIL_CONCURRENCY, (id) =>
-        api.getWorkPackage(id, cookie).catch(() => null),
+        api.getWorkPackage(id, cookie, { timeoutMs: DETAIL_TIMEOUT_MS }).catch(() => null),
       )
       for (let i = 0; i < ids.length; i++) {
         if (details[i]) wpMap[ids[i]] = details[i]
