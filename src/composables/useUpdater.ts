@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:19:46
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 10:48:00
+ * @LastEditTime: 2026-11-06 23:15:00
  * @FilePath: \src\composables\useUpdater.ts
  * @Description: 应用更新的检查、确认与安装编排
  */
@@ -12,7 +12,7 @@ import { ElMessageBox } from 'element-plus'
 import { useLogStore } from '@/stores/log.store'
 import type { UpdateCheckResult, UpdateProgress, UpdateStatus } from '@/types/update'
 
-// 转义 HTML：更新说明来自接口或文件名，弹窗按 HTML 渲染前先转义
+// 转义 HTML：版本号来自接口或文件名，弹窗按 HTML 渲染前先转义
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -66,15 +66,14 @@ export function useUpdater() {
   }
 
   /**
-   * 弹窗确认后应用更新：复制或下载安装包，校验 MD5 后安排退出后启动
+   * 弹窗确认后应用更新：下载更新包，完成后退出本程序并启动安装程序
    * @param {UpdateCheckResult} result 检查结果
-   * @returns {Promise<boolean>} 是否已安排启动安装程序
+   * @returns {Promise<boolean>} 是否已开始更新
    */
   async function offerUpdate(result: UpdateCheckResult): Promise<boolean> {
     if (!result.hasUpdate || applying.value) return false
     const lines = [`发现新版本 ${escapeHtml(result.version || '')}`]
-    if (result.notes) lines.push(`更新说明：${escapeHtml(result.notes)}`)
-    lines.push('点击「立即更新」后本程序会退出，退出 10 秒后启动安装程序。')
+    lines.push('点击「立即更新」后会下载更新包，下载完成本程序将退出并安装新版本。')
     try {
       await ElMessageBox.confirm(lines.join('<br>'), '发现新版本', {
         dangerouslyUseHTMLString: true,
@@ -89,17 +88,9 @@ export function useUpdater() {
     applying.value = true
     progress.value = null
     try {
-      const ret = await window.electron.applyUpdate({
-        source: result.source,
-        version: result.version,
-        fileName: result.fileName,
-        filePath: result.filePath,
-        url: result.url,
-        md5: result.md5,
-        size: result.size,
-      })
+      const ret = await window.electron.applyUpdate()
       if (ret.started) {
-        logStore.addLog('info', '已安排安装程序，本程序即将退出，退出 10 秒后开始安装')
+        logStore.addLog('info', '更新包已下载，本程序即将退出并安装新版本')
         return true
       }
       logStore.addLog('error', `更新失败: ${ret.error || '未知错误'}`)

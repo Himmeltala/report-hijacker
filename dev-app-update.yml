@@ -1,0 +1,4 @@
+# 开发模式的更新源，electron-updater 在未打包时读取本文件
+# 打包后读取 resources/app-update.yml，内容由 electron-builder.yml 的 publish 生成
+provider: generic
+url: http://11.1.1.184:3000/

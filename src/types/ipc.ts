@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 12:01:00
+ * @LastEditTime: 2026-11-06 23:15:00
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: 描述
  */
@@ -10,13 +10,7 @@
 import type { TaskDetailResult } from '@/types/task'
 import type { ActivitiesResponse, NotificationsResponse } from '@/types/api'
 import type { ReadonlyRawWorkPackage } from '@/types/remote'
-import type {
-  UpdateApplyParams,
-  UpdateApplyResult,
-  UpdateCheckResult,
-  UpdateProgress,
-  UpdateStatus,
-} from '@/types/update'
+import type { UpdateApplyResult, UpdateCheckResult, UpdateProgress, UpdateStatus } from '@/types/update'
 
 export interface HistoryTaskItem {
   serId: string
@@ -252,7 +246,7 @@ export interface IpcApi {
   // 应用更新
   checkUpdate: () => Promise<UpdateCheckResult>
   getUpdateStatus: () => Promise<UpdateStatus>
-  applyUpdate: (params: UpdateApplyParams) => Promise<UpdateApplyResult>
+  applyUpdate: () => Promise<UpdateApplyResult>
   onUpdateAvailable: (callback: (data: UpdateCheckResult) => void) => () => void
   onUpdateProgress: (callback: (data: UpdateProgress) => void) => () => void
   onAutoSyncSettingsChanged: (callback: () => void) => () => void

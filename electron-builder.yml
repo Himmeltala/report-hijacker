@@ -29,6 +29,12 @@ extraResources:
 
 asar: true
 
+# 更新源：generic 指向内网更新服务目录，打包时据此生成 app-update.yml 与 latest.yml
+# 安装包、latest.yml 与 blockmap 放进该目录，客户端就能检查并下载更新
+publish:
+  provider: generic
+  url: http://11.1.1.184:3000/
+
 win:
   target:
     - target: nsis

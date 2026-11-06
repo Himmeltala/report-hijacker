@@ -2,9 +2,9 @@
  * @Author: Himmeltala
  * @Date: 2026-11-05 09:12:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 08:50:00
+ * @LastEditTime: 2026-11-06 23:15:00
  * @FilePath: \server\update-server.mjs
- * @Description: 更新接口测试服务：扫描安装包目录，提供检查接口与安装包下载
+ * @Description: 更新服务：扫描安装包目录，提供更新源文件与检查接口
  */
 
 import { createHash } from 'node:crypto'
@@ -121,6 +121,7 @@ function sendStatusPage(res, info, error) {
         <dt>大小</dt><dd>${(info.size / 1024 / 1024).toFixed(1)} MB</dd>
         <dt>MD5</dt><dd><code>${escapeHtml(info.md5)}</code></dd>
         <dt>下载地址</dt><dd><a href="${escapeHtml(info.url)}">${escapeHtml(info.url)}</a></dd>
+        <dt>更新源</dt><dd><a href="/latest.yml">/latest.yml</a></dd>
       </dl>`
     : `<p class="error">${escapeHtml(error)}</p>`
   const body = `<!doctype html>
@@ -144,40 +145,56 @@ ${detail}
   res.end(body)
 }
 
-// 下载安装包，只允许访问安装包目录下的文件
-function sendInstaller(req, res, pathname) {
-  let fileName = ''
+// 文件名解码，失败返回空串
+function decodeFileName(raw) {
   try {
-    fileName = decodeURIComponent(pathname.slice(DOWNLOAD_PREFIX.length))
+    return decodeURIComponent(raw)
   } catch {
-    sendJson(res, 400, { error: '安装包文件名编码不正确' })
-    return
+    return ''
   }
+}
+
+// 校验并取回安装包目录下的文件，返回 null 时已响应错误
+function openPackageFile(res, fileName) {
   if (!fileName || basename(fileName) !== fileName) {
-    sendJson(res, 400, { error: '非法的安装包文件名' })
-    return
+    sendJson(res, 400, { error: '非法的文件名' })
+    return null
+  }
+  if (!/\.(exe|yml|blockmap)$/i.test(fileName)) {
+    sendJson(res, 400, { error: `不支持的文件类型: ${fileName}` })
+    return null
   }
   const filePath = resolve(PACKAGE_DIR, fileName)
   if (!filePath.startsWith(PACKAGE_DIR + sep) || !existsSync(filePath)) {
-    sendJson(res, 404, { error: `安装包不存在: ${fileName}` })
-    return
+    sendJson(res, 404, { error: `文件不存在: ${fileName}` })
+    return null
   }
   const info = statSync(filePath)
   if (!info.isFile()) {
-    sendJson(res, 404, { error: `安装包不存在: ${fileName}` })
-    return
+    sendJson(res, 404, { error: `文件不存在: ${fileName}` })
+    return null
   }
-  res.writeHead(200, {
-    'Content-Type': 'application/octet-stream',
-    'Content-Length': info.size,
-    'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+  return { filePath, info }
+}
+
+// 回写文件内容，asDownload 为真时按附件下载
+function sendPackageFile(req, res, fileName, asDownload) {
+  const file = openPackageFile(res, fileName)
+  if (!file) return
+  const headers = {
+    'Content-Type': /\.yml$/i.test(fileName) ? 'text/yaml; charset=utf-8' : 'application/octet-stream',
+    'Content-Length': file.info.size,
     'Cache-Control': 'no-store',
-  })
+  }
+  if (asDownload) {
+    headers['Content-Disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`
+  }
+  res.writeHead(200, headers)
   if (req.method === 'HEAD') {
     res.end()
     return
   }
-  const stream = createReadStream(filePath)
+  const stream = createReadStream(file.filePath)
   stream.on('error', () => res.destroy())
   stream.pipe(res)
 }
@@ -202,7 +219,22 @@ const server = createServer(async (req, res) => {
       return
     }
     if (pathname.startsWith(DOWNLOAD_PREFIX)) {
-      sendInstaller(req, res, pathname)
+      const fileName = decodeFileName(pathname.slice(DOWNLOAD_PREFIX.length))
+      if (!fileName) {
+        sendJson(res, 400, { error: '安装包文件名编码不正确' })
+        return
+      }
+      sendPackageFile(req, res, fileName, true)
+      return
+    }
+    // 更新源目录：electron-updater 按 latest.yml 里的文件名直取安装包与 blockmap
+    const feedFile = decodeFileName(pathname.slice(1))
+    if (feedFile && /\.(exe|yml|blockmap)$/i.test(feedFile)) {
+      if (method !== 'GET' && method !== 'HEAD') {
+        sendJson(res, 405, { error: '只支持 GET 请求' })
+        return
+      }
+      sendPackageFile(req, res, feedFile, false)
       return
     }
     if (pathname === '/' || pathname === '/index.html') {
@@ -224,6 +256,7 @@ server.listen(LISTEN_PORT, LISTEN_HOST, () => {
   console.log(`[update-server] 监听 http://${LISTEN_HOST}:${LISTEN_PORT}`)
   console.log(`[update-server] 安装包目录: ${PACKAGE_DIR}`)
   console.log(`[update-server] 检查接口: http://${LISTEN_HOST}:${LISTEN_PORT}${CHECK_PATH}`)
+  console.log(`[update-server] 更新源: http://${LISTEN_HOST}:${LISTEN_PORT}/latest.yml`)
   const installer = findLatestInstaller()
   console.log(installer ? `[update-server] 当前安装包: ${installer.fileName}` : '[update-server] 安装包目录为空，放入 exe 后即可返回更新')
 })

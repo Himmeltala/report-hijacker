@@ -1,8 +1,8 @@
 <!--
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:19:52
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 15:45:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-06 23:15:00
  * @FilePath: \src\components\UpdatePanel.vue
  * @Description: 设置弹窗里的应用更新面板：当前版本、上次检查时间与手动检查入口
 -->
@@ -42,9 +42,8 @@ const tipClass = computed(() => `is-${messageType.value}`)
 
 const progressText = computed(() => {
   const p = progress.value
-  if (!p) return '正在准备更新包...'
-  const phase = p.phase === 'copy' ? '复制' : '下载'
-  return `${phase}更新包 ${p.percent}%`
+  if (!p) return '正在下载更新包...'
+  return `下载更新包 ${p.percent}%`
 })
 
 /**
@@ -81,7 +80,7 @@ async function onCheck() {
   messageType.value = 'info'
   const started = await offerUpdate(result)
   if (started) {
-    message.value = '安装程序已启动，程序即将退出'
+    message.value = '更新包已下载，程序即将退出并安装'
     messageType.value = 'success'
   }
 }

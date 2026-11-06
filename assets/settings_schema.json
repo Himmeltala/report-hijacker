@@ -398,39 +398,11 @@
             "description": "定时检查的间隔小时数，最小 1 小时"
           },
           {
-            "key": "update.mode",
-            "label": "更新方式",
-            "type": "combo",
-            "default": "http",
-            "options": [
-              {
-                "label": "更新接口",
-                "value": "http"
-              },
-              {
-                "label": "共享盘目录",
-                "value": "share"
-              }
-            ],
-            "description": "更新接口从服务下载安装包；共享盘目录直接读取目录里的安装包并比对 MD5"
-          },
-          {
-            "key": "update.sharePath",
-            "label": "共享盘路径",
+            "key": "update.feedUrl",
+            "label": "更新源地址",
             "type": "text",
-            "default": "",
-            "depends_on": "update.mode",
-            "depends_value": "share",
-            "description": "存放安装包的共享盘目录，如 \\\\192.168.1.10\\share\\taskmanager；程序取目录中修改时间最新的 exe，也可直接填安装包路径"
-          },
-          {
-            "key": "update.apiUrl",
-            "label": "更新接口",
-            "type": "text",
-            "default": "http://11.1.1.184:3000/api/update/check",
-            "depends_on": "update.mode",
-            "depends_value": "http",
-            "description": "接口返回 JSON：{version, url, md5, notes}，url 为相对路径时按接口地址补全"
+            "default": "http://11.1.1.184:3000/",
+            "description": "latest.yml 与安装包所在目录的地址，检查更新时读取该目录下的 latest.yml"
           }
         ]
       }
