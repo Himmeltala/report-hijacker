@@ -183,7 +183,7 @@
             "label": "启用自动同步",
             "type": "checkbox",
             "default": false,
-            "description": "日期范围包含当天时，定时同步管理平台数据并执行检查"
+            "description": "日期范围包含当天时，定时同步管理平台数据，同步完成后自动执行一轮 AI 审查"
           },
           {
             "key": "history.autoSyncInterval",

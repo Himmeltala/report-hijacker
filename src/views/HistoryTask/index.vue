@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 08:54:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:45:00
+ * @LastEditTime: 2026-11-06 11:22:00
  * @FilePath: \src\views\HistoryTask\index.vue
  * @Description: 历史任务页面
 -->
@@ -1536,8 +1536,14 @@ async function runAutoSync() {
     await ipc.storeSet('lastAutoSyncTime', new Date().toISOString())
     lastSyncTime.value = new Date().toLocaleString()
     logStore.addLog('success', '自动同步完成')
+
+    // 同步被停止时不再继续审查，与工具栏「同步与 AI 审查」保持一致
+    if (!abortSync.value) {
+      logStore.addLog('info', '自动审查: 开始审查范围内任务...')
+      await handleAiReviewRange()
+    }
   } catch (e: any) {
-    logStore.addLog('error', '自动同步异常: ' + (e.message || ''))
+    logStore.addLog('error', '自动同步与审查异常: ' + (e.message || ''))
   } finally {
     selection.value = prevSelection
     autoSyncRunning.value = false
