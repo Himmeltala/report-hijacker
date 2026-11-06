@@ -92,13 +92,13 @@
             "key": "ai.timeoutSeconds",
             "label": "请求超时",
             "type": "spinbox",
-            "default": 120,
+            "default": 300,
             "min": 10,
             "max": 600,
             "step": 10,
             "suffix": "秒",
             "depends_on": "ai.enabled",
-            "description": "单次 AI 请求的超时时间，生成较慢时可调大"
+            "description": "单次 AI 请求的超时时间；提示词较长或让模型生成表格、流程图时建议不低于 300 秒"
           }
         ]
       },
