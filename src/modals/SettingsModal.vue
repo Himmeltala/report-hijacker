@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:34:53
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-06 08:50:00
  * @FilePath: \src\modals\SettingsModal.vue
  * @Description: 设置弹窗
 -->
@@ -77,6 +77,29 @@
                       :regex="settingValues[setting.key] ?? setting.default"
                       @update:regex="onRegexChange(setting.key, $event)"
                     />
+                    <div v-else-if="setting.type === 'prompts'" class="prompt-list-wrap">
+                      <div v-for="(p, i) in promptItems(setting.key)" :key="i" class="prompt-item">
+                        <div class="prompt-item-head">
+                          <el-input
+                            v-model="p.name"
+                            class="prompt-name"
+                            placeholder="提示词名称（如：流程图绘制）"
+                            @blur="persistPrompts(setting.key)"
+                          />
+                          <el-button type="danger" text @click="removePrompt(setting.key, i)">删除</el-button>
+                        </div>
+                        <el-input
+                          v-model="p.prompt"
+                          type="textarea"
+                          :autosize="{ minRows: 3, maxRows: 8 }"
+                          placeholder="提示词内容"
+                          @blur="persistPrompts(setting.key)"
+                        />
+                      </div>
+                      <el-button class="prompts-add-btn" @click="addPrompt(setting.key)">
+                        <el-icon><Plus /></el-icon> 新建提示词
+                      </el-button>
+                    </div>
                     <div v-else-if="setting.type === 'directories'" class="dir-list-wrap">
                       <div class="dir-list">
                         <div v-for="(dir, i) in settingValues[setting.key] || []" :key="i" class="dir-item">
@@ -246,6 +269,37 @@ function removeDir(key: string, index: number) {
   onChange(key, dirs)
 }
 
+// #region AI 提示词列表
+
+// 取提示词列表，缺失时初始化为空数组并保证响应式
+function promptItems(key: string): { name: string; prompt: string }[] {
+  let list = settingValues.value[key]
+  if (!Array.isArray(list)) {
+    list = []
+    settingValues.value[key] = list
+  }
+  return list
+}
+
+function addPrompt(key: string) {
+  const list = promptItems(key)
+  list.push({ name: '', prompt: '' })
+  onChange(key, [...list])
+}
+
+function removePrompt(key: string, index: number) {
+  const list = promptItems(key)
+  list.splice(index, 1)
+  onChange(key, [...list])
+}
+
+// 名称或内容编辑后整体回写
+function persistPrompts(key: string) {
+  onChange(key, promptItems(key))
+}
+
+// #endregion
+
 async function handleExport() {
   try {
     const ret = await window.electron?.exportSettings?.()
@@ -387,6 +441,31 @@ async function handleReset() {
   white-space: nowrap;
 }
 .dir-add-btn {
+  align-self: flex-start;
+}
+.prompt-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.prompt-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--app-radius-sm);
+}
+.prompt-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.prompt-name {
+  width: 240px;
+  flex-shrink: 0;
+}
+.prompts-add-btn {
   align-self: flex-start;
 }
 .rules-list-wrap {
