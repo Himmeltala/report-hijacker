@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 10:48:00
+ * @LastEditTime: 2026-11-06 11:49:00
  * @FilePath: \electron\services\updateService.ts
  * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后在本程序退出后启动安装程序
  */
@@ -378,6 +378,7 @@ function buildStatus(deps: UpdateDeps): UpdateStatus {
  *
  * 安装包按所有用户安装，清单要求管理员权限，直接 spawn 会因未提权返回 EACCES，
  * 由 Start-Process 走 ShellExecute，由系统弹 UAC 提权。
+ * 启动时带 --updated：NSIS 据此走更新模式，跳过许可与安装目录页，检测到旧进程仍在时静默关闭，不弹窗等待用户确认。
  * @param {string} file 安装包路径
  * @returns {Promise<string>} 启动失败原因，成功返回空字符串
  */
@@ -393,7 +394,7 @@ function launchInstallerAfterExit(file: string): Promise<string> {
     `$deadline = (Get-Date).AddSeconds(30)`,
     `while ((Get-Date) -lt $deadline) { if (-not (Get-Process -Name '${appName}' -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 500 }`,
     `Start-Sleep -Seconds ${INSTALLER_DELAY_SECONDS}`,
-    `Start-Process -FilePath '${target}'`,
+    `Start-Process -FilePath '${target}' -ArgumentList '--updated'`,
   ].join('; ')
   return new Promise((resolve) => {
     const child = spawn(
