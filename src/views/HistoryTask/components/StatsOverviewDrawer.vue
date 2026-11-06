@@ -2,9 +2,9 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 01:00:39
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-28 10:11:16
+ * @LastEditTime: 2026-11-06 20:59:51
  * @FilePath: /src/views/HistoryTask/components/StatsOverviewDrawer.vue
- * @Description: 数据统计抽屉组件，组合热力图统计与矩阵树形统计两个子组件
+ * @Description: 数据统计抽屉组件，组合任务数热力图、每日达标时长热力图、矩阵树形与趋势四个子组件
 -->
 <template>
   <div class="stats-overview-drawer">
@@ -17,6 +17,7 @@
       <el-date-picker v-else v-model="monthValue" type="month" :clearable="false" style="width: 130px" />
     </div>
     <HeatmapStats :range="range" />
+    <DailyHoursHeatmapStats :range="range" />
     <TreemapStats :range="range" />
     <TrendStats :range="range" />
   </div>
@@ -25,6 +26,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import HeatmapStats from '@/views/HistoryTask/components/HeatmapStats.vue'
+import DailyHoursHeatmapStats from '@/views/HistoryTask/components/DailyHoursHeatmapStats.vue'
 import TreemapStats from '@/views/HistoryTask/components/TreemapStats.vue'
 import TrendStats from '@/views/HistoryTask/components/TrendStats.vue'
 
