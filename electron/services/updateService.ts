@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:40:00
+ * @LastEditTime: 2026-11-06 08:50:00
  * @FilePath: \electron\services\updateService.ts
  * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后启动安装程序
  */
@@ -317,7 +317,7 @@ async function checkForUpdate(deps: UpdateDeps): Promise<UpdateCheckResult> {
     payload =
       source === 'share'
         ? await checkShare(settings.get('update.sharePath', ''), state.installedMd5)
-        : await checkHttp(settings.get('update.apiUrl', ''), state.installedMd5)
+        : await checkHttp(settings.get('update.apiUrl', 'http://11.1.1.184:3000/api/update/check'), state.installedMd5)
   } catch (e: any) {
     payload = { hasUpdate: false, source, error: e?.message || '检查更新失败' }
   }

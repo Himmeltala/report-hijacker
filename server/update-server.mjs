@@ -2,7 +2,7 @@
  * @Author: Himmeltala
  * @Date: 2026-11-05 09:12:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 09:12:08
+ * @LastEditTime: 2026-11-06 08:50:00
  * @FilePath: \server\update-server.mjs
  * @Description: 更新接口测试服务：扫描安装包目录，提供检查接口与安装包下载
  */
