@@ -66,7 +66,7 @@ for (const target of TARGETS) {
   // 最后手段：列出锁定的文件
   console.error(`[clean-out] 无法删除 ${target} 目录，可能被以下程序占用：`)
   console.error(`  - 文件资源管理器打开了 ${target} 目录`)
-  console.error('  - 上一次打包的 TaskManager.exe 仍在运行')
+  console.error('  - 上一次打包的 ReportHijacker.exe 仍在运行')
   console.error('  - 杀毒软件正在扫描')
   console.error('')
   console.error('请关掉上述程序后重试，或用 handle64.exe 查找锁定进程：')

@@ -4,8 +4,8 @@
 # 安装范围固定为所有用户，用户改不了；安装目录仍由目录选择页决定。
 # 安装包文件名由 scripts/make-win.js 用 -c.nsis.artifactName 传入。
 
-appId: com.zhengrenfu.taskmanager
-productName: TaskManager
+appId: com.himmeltala.reporthijacker
+productName: ReportHijacker
 
 directories:
   # 默认值是 dist，与 vite 的渲染进程产物目录同名。留默认值会让 electron-builder 把 dist 当成输出目录
@@ -51,7 +51,7 @@ nsis:
   createStartMenuShortcut: true
   runAfterFinish: true
   # 快捷方式名与卸载列表用中文；productName 保持英文，存储路径与安装目录跟着它
-  shortcutName: 任务管理器
-  uninstallDisplayName: 任务管理器
+  shortcutName: 日报工具
+  uninstallDisplayName: 日报工具
   # 安装页显示详细信息面板并输出安装步骤日志，脚本内容见 scripts/installer.nsh
   include: scripts/installer.nsh

@@ -3,7 +3,7 @@
  * @Date: 2026-11-05 09:14:14
  * @LastEditors: Himmeltala
  * @LastEditTime: 2026-11-06 10:25:00
- * @FilePath: /pros/self/task-manager/src/App.vue
+ * @FilePath: /pros/self/report-hijacker/src/App.vue
  * @Description: 根组件
 -->
 <template>

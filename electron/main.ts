@@ -30,7 +30,7 @@ import { setupBackupSchedule } from '@schedules/main/backupSchedule'
 import { setupUpdateSchedule } from '@schedules/main/updateSchedule'
 
 // 窗口标题与任务栏用中文；存储路径由 package.json 的 productName 决定，保持英文
-const APP_TITLE = '任务管理器'
+const APP_TITLE = '日报工具'
 let mainWindow: BrowserWindow | null = null
 
 let activeProfile = ''
@@ -224,7 +224,7 @@ app
   .whenReady()
   .then(() => {
     // Windows 系统通知要求与 electron-builder.yml 的 appId 一致，不一致则通知不显示
-    app.setAppUserModelId('com.zhengrenfu.taskmanager')
+    app.setAppUserModelId('com.himmeltala.reporthijacker')
 
     activeProfile = initProfileSystem()
 

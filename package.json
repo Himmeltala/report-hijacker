@@ -1,6 +1,6 @@
 {
-  "name": "task-manager",
-  "productName": "TaskManager",
+  "name": "report-hijacker",
+  "productName": "ReportHijacker",
   "version": "1.0.0",
   "private": true,
   "type": "module",

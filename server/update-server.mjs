@@ -126,12 +126,12 @@ function sendStatusPage(res, info, error) {
     : `<p class="error">${escapeHtml(error)}</p>`
   const body = `<!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><title>任务管理器更新服务</title>
+<head><meta charset="utf-8"><title>日报工具更新服务</title>
 <style>body{font-family:"Microsoft YaHei",Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.7;color:#222}
 h1{font-size:20px}dt{float:left;width:88px;color:#666}dd{margin-left:88px;word-break:break-all}code{background:#f3f3f3;padding:1px 4px;border-radius:3px}
 .error{color:#c0392b}</style></head>
 <body>
-<h1>任务管理器更新服务</h1>
+<h1>日报工具更新服务</h1>
 <p>安装包目录：<code>${escapeHtml(PACKAGE_DIR)}</code></p>
 ${detail}
 <p>检查接口：<a href="${CHECK_PATH}">${CHECK_PATH}</a></p>

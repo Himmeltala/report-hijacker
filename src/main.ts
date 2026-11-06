@@ -3,7 +3,7 @@
  * @Date: 2026-11-04 10:28:53
  * @LastEditors: zhengrenfu
  * @LastEditTime: 2026-11-05 10:20:09
- * @FilePath: /pros/self/task-manager/src/main.ts
+ * @FilePath: /pros/self/report-hijacker/src/main.ts
  * @Description: 应用入口
  */
 

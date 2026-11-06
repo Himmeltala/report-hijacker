@@ -20,7 +20,7 @@ const BINARIES_MIRROR =
 const REQUIRED_BUILD_OUTPUT = ['dist/index.html', 'dist-electron/main.js', 'dist-electron/preload.cjs']
 
 // ${version} 由 electron-builder 替换成 package.json 里的版本号
-const ARTIFACT_NAME = 'TaskManager-${version}-setup.exe'
+const ARTIFACT_NAME = 'report-hijacker-${version}-setup.exe'
 
 /**
  * 执行子命令，失败即中断
