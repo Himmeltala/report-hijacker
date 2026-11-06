@@ -7,3 +7,5 @@ nodeLinker: hoisted
 overrides:
   yauzl: 3.4.0
   '@electron/get@3.0.0': 3.1.0
+patchedDependencies:
+  app-builder-lib@26.15.3: patches/app-builder-lib@26.15.3.patch

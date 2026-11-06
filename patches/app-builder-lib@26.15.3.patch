@@ -1,0 +1,28 @@
+diff --git a/out/targets/nsis/NsisTarget.js b/out/targets/nsis/NsisTarget.js
+index 92cac56e79f94f01525dd9ae007d8e866075de1b..6353b33d98c62eb039c0887e6d118cc2ec97f6be 100644
+--- a/out/targets/nsis/NsisTarget.js
++++ b/out/targets/nsis/NsisTarget.js
+@@ -369,10 +369,22 @@ class NsisTarget extends core_1.Target {
+                 }
+             }
+         }
+-        else {
++        else if (isWin) {
+             const wineVm = new WineVm_1.WineVmManager((_a = packager.config.toolsets) === null || _a === void 0 ? void 0 : _a.wine);
+             await wineVm.exec(installerPath, [], { env: { __COMPAT_LAYER: "RunAsInvoker" } });
+         }
++        else {
++            // 非 Windows 主机未必装了 wine（Linux 上装它要 root）。卸载器本来就是安装器里内嵌的那段数据，
++            // 用纯 JS 解析出来即可，不必真的执行安装器；解析不了再退回 wine。
++            try {
++                await nsisUtil_1.UninstallerReader.exec(installerPath, uninstallerPath);
++            }
++            catch (error) {
++                builder_util_1.log.warn(`UninstallerReader 解析失败，改用 wine 执行安装器: ${error.message}`);
++                const wineVm = new WineVm_1.WineVmManager((_a = packager.config.toolsets) === null || _a === void 0 ? void 0 : _a.wine);
++                await wineVm.exec(installerPath, [], { env: { __COMPAT_LAYER: "RunAsInvoker" } });
++            }
++        }
+         await packager.signIf(uninstallerPath);
+         delete defines.BUILD_UNINSTALLER;
+         // platform-specific path, not wine
