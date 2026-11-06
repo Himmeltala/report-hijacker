@@ -1,8 +1,8 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-07-14 21:36:19
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-09-21 00:00:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-06 10:25:00
  * @FilePath: \src\router\index.ts
  * @Description: 路由配置与上次激活菜单恢复
  */
@@ -11,7 +11,6 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { ipc } from '@/utils/ipc'
 import ExportTask from '@/views/ExportTask/index.vue'
 import CheckTask from '@/views/CheckTask/index.vue'
-import AiAssistant from '@/views/AiAssistant/index.vue'
 import TaskExtract from '@/views/TaskExtract/index.vue'
 import HistoryTask from '@/views/HistoryTask/index.vue'
 import Workbench from '@/views/Workbench/index.vue'
@@ -56,12 +55,6 @@ const routes = [
     name: 'ExportTask',
     component: ExportTask,
     meta: { title: '导出任务' },
-  },
-  {
-    path: '/ai-assistant',
-    name: 'AiAssistant',
-    component: AiAssistant,
-    meta: { title: 'AI 助手' },
   },
 ]
 

@@ -1,8 +1,8 @@
 <!--
  * @Author: zhengrenfu
  * @Date: 2026-11-05 09:14:14
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-06 08:50:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-06 10:25:00
  * @FilePath: /pros/self/task-manager/src/App.vue
  * @Description: 根组件
 -->
@@ -34,10 +34,6 @@
         <el-menu-item index="/export-task">
           <el-icon><EditPen /></el-icon>
           <span>导出任务</span>
-        </el-menu-item>
-        <el-menu-item index="/ai-assistant">
-          <el-icon><ChatDotRound /></el-icon>
-          <span>AI 助手</span>
         </el-menu-item>
       </el-menu>
 
@@ -88,7 +84,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { EditPen, Connection, UserFilled, Clock, Bell, ArrowDown, Check, Setting, ChatDotRound } from '@element-plus/icons-vue'
+import { EditPen, Connection, UserFilled, Clock, Bell, ArrowDown, Check, Setting } from '@element-plus/icons-vue'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
