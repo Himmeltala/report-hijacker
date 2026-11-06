@@ -1,8 +1,8 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:19:46
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:45:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-06 10:48:00
  * @FilePath: \src\composables\useUpdater.ts
  * @Description: 应用更新的检查、确认与安装编排
  */
@@ -66,15 +66,15 @@ export function useUpdater() {
   }
 
   /**
-   * 弹窗确认后应用更新：复制或下载安装包，校验 MD5 并启动安装程序
+   * 弹窗确认后应用更新：复制或下载安装包，校验 MD5 后安排退出后启动
    * @param {UpdateCheckResult} result 检查结果
-   * @returns {Promise<boolean>} 安装程序是否已启动
+   * @returns {Promise<boolean>} 是否已安排启动安装程序
    */
   async function offerUpdate(result: UpdateCheckResult): Promise<boolean> {
     if (!result.hasUpdate || applying.value) return false
     const lines = [`发现新版本 ${escapeHtml(result.version || '')}`]
     if (result.notes) lines.push(`更新说明：${escapeHtml(result.notes)}`)
-    lines.push('点击「立即更新」后本程序会退出并启动安装程序。')
+    lines.push('点击「立即更新」后本程序会退出，退出 10 秒后启动安装程序。')
     try {
       await ElMessageBox.confirm(lines.join('<br>'), '发现新版本', {
         dangerouslyUseHTMLString: true,
@@ -96,9 +96,10 @@ export function useUpdater() {
         filePath: result.filePath,
         url: result.url,
         md5: result.md5,
+        size: result.size,
       })
       if (ret.started) {
-        logStore.addLog('info', '安装程序已启动，本程序即将退出')
+        logStore.addLog('info', '已安排安装程序，本程序即将退出，退出 10 秒后开始安装')
         return true
       }
       logStore.addLog('error', `更新失败: ${ret.error || '未知错误'}`)

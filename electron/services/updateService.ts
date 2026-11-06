@@ -2,12 +2,13 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 08:50:00
+ * @LastEditTime: 2026-11-06 10:48:00
  * @FilePath: \electron\services\updateService.ts
- * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后启动安装程序
+ * @Description: 应用更新服务：从共享盘或更新接口检查安装包，校验 MD5 后在本程序退出后启动安装程序
  */
 
-import { app, ipcMain, BrowserWindow, shell } from 'electron'
+import { app, ipcMain, BrowserWindow } from 'electron'
+import { spawn } from 'child_process'
 import { createHash } from 'crypto'
 import { Readable } from 'stream'
 import {
@@ -43,8 +44,11 @@ const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
 // 进度事件发送节流间隔
 const PROGRESS_INTERVAL_MS = 200
 
-// 启动安装程序后等待多久退出本程序
-const QUIT_DELAY_MS = 1_500
+// 安排安装程序后等待多久退出本程序，留出时间让渲染进程处理完启动结果
+const QUIT_DELAY_MS = 3_000
+
+// 本程序退出后等待多久再打开安装程序，避免安装器检测到旧进程未退完
+const INSTALLER_DELAY_SECONDS = 10
 
 // #endregion
 
@@ -201,6 +205,11 @@ function copyWithProgress(src: string, dest: string, report: (p: UpdateProgress)
     reader.on('error', reject)
     writer.on('error', reject)
     writer.on('finish', () => {
+      // 复制过程中源文件被改写时字节数对不上，不能当作完整包
+      if (received !== total) {
+        reject(new Error(`更新包复制不完整（${received}/${total} 字节），请重新检查更新`))
+        return
+      }
       report({ phase: 'copy', received: total, total, percent: 100 })
       resolve()
     })
@@ -213,6 +222,8 @@ async function downloadWithProgress(url: string, dest: string, report: (p: Updat
   const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
   if (!response.ok || !response.body) throw new Error(`下载更新包失败: HTTP ${response.status}`)
   const total = Number(response.headers.get('content-length') || 0)
+  // 有内容编码时 content-length 是压缩后的大小，和实际收到的字节数不可比
+  const encoded = !!response.headers.get('content-encoding')
   const source = Readable.fromWeb(response.body as any)
   const writer = createWriteStream(dest)
   let received = 0
@@ -229,6 +240,8 @@ async function downloadWithProgress(url: string, dest: string, report: (p: Updat
     })
     source.pipe(writer)
   })
+  // content-length 已知时核对实际字节数，下载中断或服务端提前结束都能发现
+  if (!encoded && total && received !== total) throw new Error(`更新包下载不完整（${received}/${total} 字节），请重试`)
 }
 
 // 进度上报节流包装
@@ -290,16 +303,19 @@ async function checkHttp(apiUrl: string, installedMd5: string): Promise<CheckPay
   const version = String(data?.version || '').trim()
   if (!version) return { hasUpdate: false, source: 'http' }
   const md5 = String(data?.md5 || '').toLowerCase()
+  const size = Number(data?.size) || 0
   const notes = String(data?.notes || '')
   const installedVersion = app.getVersion()
   const alreadyInstalled = !!md5 && md5 === installedMd5
-  if (version === installedVersion || alreadyInstalled) {
+  // 同版本重新打包时版本号不变，只能靠 MD5 变化识别，和共享盘方式保持一致
+  const packageChanged = !!installedMd5 && !!md5 && md5 !== installedMd5
+  if (alreadyInstalled || (version === installedVersion && !packageChanged)) {
     return { hasUpdate: false, source: 'http', version, md5: md5 || undefined, notes }
   }
   const downloadUrl = resolveDownloadUrl(String(data?.url || ''), url)
   if (!downloadUrl) throw new Error('更新接口没有返回可用的下载地址')
   if (!md5) throw new Error('更新接口没有返回 MD5，无法校验更新包')
-  return { hasUpdate: true, source: 'http', version, url: downloadUrl, md5: md5 || undefined, notes }
+  return { hasUpdate: true, source: 'http', version, url: downloadUrl, md5, size: size || undefined, notes }
 }
 
 /**
@@ -358,29 +374,46 @@ function buildStatus(deps: UpdateDeps): UpdateStatus {
 // #region 应用更新
 
 /**
- * 用系统 Shell 启动安装程序并安排本程序退出，安装完成后由 NSIS 的 runAfterFinish 打开新版
+ * 安排安装程序在本程序退出后启动：脱离主进程的 PowerShell 等本程序进程全部退出，再等 10 秒打开安装包
  *
  * 安装包按所有用户安装，清单要求管理员权限，直接 spawn 会因未提权返回 EACCES，
- * 改由 ShellExecute 启动，由系统弹 UAC 提权。
+ * 由 Start-Process 走 ShellExecute，由系统弹 UAC 提权。
  * @param {string} file 安装包路径
  * @returns {Promise<string>} 启动失败原因，成功返回空字符串
  */
-async function launchInstaller(file: string): Promise<string> {
-  try {
-    // 用户取消 UAC 提权时这里会返回错误，保留本程序让用户看到原因
-    const error = await shell.openPath(file)
-    if (error) return error
-  } catch (e: any) {
-    return e?.message || '未知错误'
-  }
-  setTimeout(() => {
-    if (installing) app.quit()
-  }, QUIT_DELAY_MS)
-  return ''
+function launchInstallerAfterExit(file: string): Promise<string> {
+  const target = file.replace(/'/g, "''")
+  const appName = basename(process.execPath)
+    .replace(/\.exe$/i, '')
+    .replace(/'/g, "''")
+  const script = [
+    `$app = Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue`,
+    `if ($app) { try { $app.WaitForExit(60000) | Out-Null } catch {} }`,
+    // 主进程退出后渲染、GPU 等子进程可能还在收尾，等同名进程都消失再启动安装程序
+    `$deadline = (Get-Date).AddSeconds(30)`,
+    `while ((Get-Date) -lt $deadline) { if (-not (Get-Process -Name '${appName}' -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 500 }`,
+    `Start-Sleep -Seconds ${INSTALLER_DELAY_SECONDS}`,
+    `Start-Process -FilePath '${target}'`,
+  ].join('; ')
+  return new Promise((resolve) => {
+    const child = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
+      { detached: true, stdio: 'ignore', windowsHide: true },
+    )
+    child.once('error', (e) => resolve(e.message || '无法启动安装程序'))
+    child.once('spawn', () => {
+      child.unref()
+      setTimeout(() => {
+        if (installing) app.quit()
+      }, QUIT_DELAY_MS)
+      resolve('')
+    })
+  })
 }
 
 /**
- * 应用更新：复制或下载安装包到本地缓存，校验 MD5 后启动安装程序
+ * 应用更新：复制或下载安装包到本地缓存，校验 MD5，退出后启动安装程序
  * @param {UpdateDeps} deps 设置与窗口依赖
  * @param {UpdateApplyParams} payload 检查结果里带过来的更新包信息
  * @returns {Promise<UpdateApplyResult>} 是否已启动安装及失败原因
@@ -390,6 +423,9 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
   if (installing) return { started: false, error: '安装程序正在启动，请稍候' }
   if (!payload?.source) return { started: false, error: '缺少更新包信息' }
   if (process.platform !== 'win32') return { started: false, error: '仅 Windows 支持自动安装更新' }
+  const expectedMd5 = String(payload.md5 || '').toLowerCase()
+  if (!expectedMd5) return { started: false, error: '缺少更新包 MD5，无法校验完整性' }
+  const expectedSize = Number(payload.size) || 0
   const report = createProgressReporter((p) => sendToWindow(deps.getWindow, 'event:updateProgress', p))
   const pkgDir = join(updateDir(), 'pkg')
   const fileName = basename(String(payload?.fileName || '').trim()) || 'installer.exe'
@@ -408,11 +444,23 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
       await downloadWithProgress(url, target, report)
     }
 
-    const expected = String(payload.md5 || '').toLowerCase()
-    const actual = await computeFileMd5(target)
-    if (expected && actual !== expected) {
+    // 大小与 MD5 任一不符都按包损坏处理：删掉文件，不启动安装
+    const actualSize = statSync(target).size
+    if (actualSize <= 0) {
       rmSync(target, { force: true })
-      return { started: false, error: '更新包 MD5 校验不通过，请重新检查更新' }
+      return { started: false, error: '更新包为空，已取消更新' }
+    }
+    if (expectedSize > 0 && actualSize !== expectedSize) {
+      rmSync(target, { force: true })
+      return {
+        started: false,
+        error: `更新包大小不一致（应为 ${expectedSize} 字节，实际 ${actualSize} 字节），已取消更新`,
+      }
+    }
+    const actual = await computeFileMd5(target)
+    if (actual !== expectedMd5) {
+      rmSync(target, { force: true })
+      return { started: false, error: '更新包 MD5 校验不通过，文件可能已损坏，已取消更新' }
     }
 
     const state = readState()
@@ -424,7 +472,7 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
     writeState(state)
 
     installing = true
-    const launchError = await launchInstaller(target)
+    const launchError = await launchInstallerAfterExit(target)
     if (launchError) {
       installing = false
       // 安装没有开始，清掉待定记录，避免下次启动误记为已安装
@@ -434,6 +482,8 @@ async function applyUpdate(deps: UpdateDeps, payload?: UpdateApplyParams): Promi
     }
     return { started: true }
   } catch (e: any) {
+    // 复制或下载中断时清掉半截文件，避免下次误用
+    rmSync(target, { force: true })
     return { started: false, error: e?.message || '更新失败' }
   }
 }

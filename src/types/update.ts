@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:19:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 09:20:00
+ * @LastEditTime: 2026-11-06 10:48:00
  * @FilePath: \src\types\update.ts
  * @Description: 应用更新相关的检查结果、进度与状态类型
  */
@@ -50,9 +50,10 @@ export interface UpdateApplyParams {
   filePath?: string
   url?: string
   md5?: string
+  size?: number
 }
 
-/** 应用更新的结果，started 为 true 表示安装程序已启动 */
+/** 应用更新的结果，started 为 true 表示已安排在本程序退出后启动安装程序 */
 export interface UpdateApplyResult {
   started: boolean
   error?: string
