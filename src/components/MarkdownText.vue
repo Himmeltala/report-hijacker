@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-04 15:20:00
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 08:50:00
+ * @LastEditTime: 2026-11-06 11:13:00
  * @FilePath: \src\components\MarkdownText.vue
  * @Description: Markdown 渲染组件，用于展示 AI 审查结论，支持 mermaid 流程图与右键导出（导出前净化 SVG 防止画布染污）
 -->
@@ -57,6 +57,17 @@ function extractMermaid(text: string): { stripped: string; sources: string[] } {
   return { stripped, sources }
 }
 
+// 节点文字里的英文括号会被 Mermaid 当成形状语法，任务原文带 close() 这类写法时整张图解析失败；
+// 重试前把这类方括号标签改成双引号包裹，数据形状（如 [(库)]）保持原样
+function quoteBracketedLabels(src: string): string {
+  return src.replace(/([A-Za-z_][\w-]*)\[([^[\]\n]*)\]/g, (m, id: string, label: string) => {
+    // 已加引号，或以形状语法开头，都不动
+    if (label.startsWith('"') || /^[[(/\\]/.test(label)) return m
+    if (!/[()"]/.test(label)) return m
+    return `${id}["${label.replace(/"/g, '&quot;')}"]`
+  })
+}
+
 // 先转义尖括号，避免结论里的原始 HTML 被当成标签渲染；表格外包一层容器，窄列下可横向滚动
 const parsed = computed(() => {
   const { stripped, sources } = extractMermaid(props.text || '')
@@ -91,6 +102,18 @@ async function renderMermaid() {
       if (!block.isConnected) continue
       block.innerHTML = svg
     } catch {
+      const quoted = quoteBracketedLabels(src)
+      // 括号问题才值得重试，其他语法错误直接退回源码展示
+      if (quoted !== src) {
+        try {
+          const { svg } = await mermaid.render(`${id}-q`, quoted)
+          if (!block.isConnected) continue
+          block.innerHTML = svg
+          continue
+        } catch {
+          // 加引号仍解析失败，落到下面的源码展示
+        }
+      }
       // 图源语法错误时退回源码展示，保证结论仍可读
       block.classList.add('mermaid-failed')
       block.textContent = src
