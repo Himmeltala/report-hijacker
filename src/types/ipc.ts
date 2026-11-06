@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:45:00
+ * @LastEditTime: 2026-11-05 13:30:00
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: 描述
  */
@@ -93,6 +93,19 @@ export interface WriteTextFileParams {
   content: string
 }
 
+export interface WriteBinaryFileParams {
+  filePath: string
+  dataBase64: string
+}
+
+export interface CopyImagePngParams {
+  dataBase64: string
+}
+
+export interface CopyTextParams {
+  text: string
+}
+
 export interface FetchNotificationsParams {
   cookie: string
   onlyUnread?: boolean
@@ -154,6 +167,9 @@ export interface IpcApi {
   saveFile: (params: SaveFileParams) => Promise<string | null>
 
   writeTextFile: (params: WriteTextFileParams) => Promise<void>
+  writeBinaryFile: (params: WriteBinaryFileParams) => Promise<void>
+  copyImagePng: (params: CopyImagePngParams) => Promise<void>
+  copyText: (params: CopyTextParams) => Promise<void>
   fillExcelTemplate: (params: FillExcelTemplateParams) => Promise<FillExcelTemplateResult>
 
   listHistoryDates: (range?: { startDate?: string; endDate?: string }) => Promise<string[]>

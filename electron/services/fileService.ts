@@ -2,12 +2,12 @@
  * @Author: Himmeltala
  * @Date: 2026-11-05 10:40:00
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:40:00
+ * @LastEditTime: 2026-11-05 13:30:00
  * @FilePath: \electron\services\fileService.ts
- * @Description: 文件对话框与文本写入服务
+ * @Description: 文件对话框、文本与图片写入服务
  */
 
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, clipboard, nativeImage } from 'electron'
 import type { BrowserWindow, OpenDialogOptions, SaveDialogOptions } from 'electron'
 import { writeFileSync } from 'fs'
 
@@ -56,5 +56,21 @@ export function setupFileIpc(deps: { getWindow: () => BrowserWindow | null }): v
   ipcMain.handle('file:writeTextFile', async (_e, params) => {
     const { filePath, content } = params
     writeFileSync(filePath, content, 'utf-8')
+  })
+
+  // 二进制写入：PNG 等图片由渲染进程转 base64 传入，写文件或存剪贴板
+  ipcMain.handle('file:writeBinaryFile', (_e, params) => {
+    const { filePath, dataBase64 } = params
+    writeFileSync(filePath, Buffer.from(dataBase64, 'base64'))
+  })
+
+  ipcMain.handle('clipboard:writeImagePng', (_e, params) => {
+    const { dataBase64 } = params
+    clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(dataBase64, 'base64')))
+  })
+
+  // 纯文本写剪贴板：图片复制失败时把 mermaid 源码等文本带出去
+  ipcMain.handle('clipboard:writeText', (_e, params) => {
+    clipboard.writeText(String(params?.text || ''))
   })
 }

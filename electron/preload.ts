@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-13 00:26:38
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 09:20:00
+ * @LastEditTime: 2026-11-05 13:30:00
  * @FilePath: \electron\preload.ts
  * @Description: 预加载脚本，通过 contextBridge 暴露 IPC 接口
  */
@@ -55,6 +55,9 @@ contextBridge.exposeInMainWorld('electron', {
 
   // #region 文件读写
   writeTextFile: (params: any) => ipcRenderer.invoke('file:writeTextFile', params),
+  writeBinaryFile: (params: any) => ipcRenderer.invoke('file:writeBinaryFile', params),
+  copyImagePng: (params: any) => ipcRenderer.invoke('clipboard:writeImagePng', params),
+  copyText: (params: any) => ipcRenderer.invoke('clipboard:writeText', params),
   fillExcelTemplate: (params: any) => ipcRenderer.invoke('file:fillExcelTemplate', params),
   // #endregion
 
