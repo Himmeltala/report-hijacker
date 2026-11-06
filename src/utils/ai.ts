@@ -2,12 +2,12 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-03 22:25:54
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 14:21:53
+ * @LastEditTime: 2026-11-06 12:04:00
  * @FilePath: \src\utils\ai.ts
  * @Description: AI 模块层工具：提示词占位符替换、富文本转纯文本（保留图片占位）与通用 AI 通道入口
  */
 
-import type { AiChatParams } from '@/types/ipc'
+import type { AiChatParams, AiChatResult } from '@/types/ipc'
 
 // #region 常量
 
@@ -69,13 +69,12 @@ export function toPlainText(raw: string): string {
 
 /**
  * 调用统一 AI 通道
- * @param {string} prompt 已组装完成的完整提示词
- * @returns {Promise<{ text: string; reasoning: string }>} 模型输出文本与思考过程，非推理模型思考为空
+ * @param {AiChatParams} params 单轮提示词或完整消息列表，可附带工具定义
+ * @returns {Promise<AiChatResult & { reasoning: string }>} 模型输出文本、思考过程与本轮工具调用，思考过程统一转为字符串
  */
-export async function aiChat(prompt: string): Promise<{ text: string; reasoning: string }> {
-  const params: AiChatParams = { prompt }
+export async function aiChat(params: AiChatParams): Promise<AiChatResult & { reasoning: string }> {
   const ret = await window.electron.aiChat(params)
-  return { text: ret.text, reasoning: ret.reasoning ?? '' }
+  return { text: ret.text, reasoning: ret.reasoning ?? '', toolCalls: ret.toolCalls }
 }
 
 /**

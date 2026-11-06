@@ -2,11 +2,12 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-04 23:59:29
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-04 16:30:00
+ * @LastEditTime: 2026-11-06 12:08:00
  * @FilePath: \src\services\taskValidation.ts
  * @Description: 任务取数与 AI 审查编排服务
  */
 
+import type { AiChatMessage, AiChatTool, AiChatToolCall } from '@/types/ipc'
 import type { TaskDetailResult } from '@/types/task'
 import { fetchTaskDetail, checkComments } from '@/utils/taskDetail'
 import { convertIso8601ToHours } from '@/utils/parser'
@@ -78,6 +79,157 @@ function extractCommentText(activities: any): string {
 // 任务审查模块提示词设置键（提示词按模块独立配置，连接配置统一全局）
 const TASK_REVIEW_PROMPT_KEY = 'ai.taskReview.prompt'
 
+// 辅助提示词设置键，审查时每条注册成一个可调用工具
+const AUX_PROMPT_SETTING_KEY = 'ai.prompts'
+
+// 单条任务审查允许的工具调用轮数，防止模型反复调用不收敛
+const MAX_TOOL_ROUNDS = 4
+
+// 工具模式下的附加说明：流程图必须由辅助提示词工具生成，避免模型自己直接编
+const TOOL_MODE_INSTRUCTION = [
+  '当「怎么做」缺少流程图时，调用可用的辅助提示词工具生成 Mermaid 源码，不要自己直接编流程图。',
+  '把工具返回的 Mermaid 源码原样放进「建议：」末尾，作为 ```mermaid 围栏代码块。',
+  '工具结果返回后直接输出最终审查结论，不要重复调用同一个工具。',
+].join('\n')
+
+// 设置里的一条辅助提示词，对应一个工具
+interface AuxPromptTool {
+  name: string
+  title: string
+  prompt: string
+}
+
+/**
+ * 读取设置里的辅助提示词，空白项跳过
+ * @returns {Promise<AuxPromptTool[]>} 可注册为工具的辅助提示词
+ */
+async function loadAuxPromptTools(): Promise<AuxPromptTool[]> {
+  const raw = await window.electron.getSetting(AUX_PROMPT_SETTING_KEY)
+  if (!Array.isArray(raw)) return []
+  const tools: AuxPromptTool[] = []
+  for (const item of raw) {
+    const prompt = String((item as any)?.prompt ?? '').trim()
+    if (!prompt) continue
+    const title = String((item as any)?.name ?? '').trim() || `辅助提示词 ${tools.length + 1}`
+    tools.push({ name: `aux_prompt_${tools.length + 1}`, title, prompt })
+  }
+  return tools
+}
+
+/**
+ * 把辅助提示词注册成工具定义，参数统一为 input
+ * @param {AuxPromptTool[]} tools 辅助提示词
+ * @returns {AiChatTool[]} 工具定义
+ */
+function buildToolDefs(tools: AuxPromptTool[]): AiChatTool[] {
+  return tools.map((tool) => ({
+    type: 'function' as const,
+    function: {
+      name: tool.name,
+      description: `${tool.title}：把需要处理的步骤或正文放进 input 参数，返回该提示词的处理结果；流程图类提示词返回 Mermaid 源码。`,
+      parameters: {
+        type: 'object',
+        properties: {
+          input: { type: 'string', description: '按顺序排列的步骤或需要处理的正文' },
+        },
+        required: ['input'],
+      },
+    },
+  }))
+}
+
+/**
+ * 把模型给出的内容填进辅助提示词：【步骤列表】之后的示例步骤整体替换
+ * @param {string} template 辅助提示词模板
+ * @param {string} input 模型传入的内容
+ * @returns {string} 填好的提示词
+ */
+function fillAuxPrompt(template: string, input: string): string {
+  const marker = '【步骤列表】'
+  const index = template.indexOf(marker)
+  if (index >= 0) return `${template.slice(0, index + marker.length)}\n${input}`
+  return `${template}\n\n${input}`
+}
+
+/**
+ * 去掉模型返回的代码围栏，只保留源码
+ * @param {string} text 模型输出
+ * @returns {string} 去掉围栏后的文本
+ */
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim()
+  const matched = trimmed.match(/```[a-zA-Z]*\s*\n([\s\S]*?)```/)
+  if (matched) return matched[1].trim()
+  // 围栏没闭合时去掉开头那一行和末尾残留的反引号
+  return trimmed
+    .replace(/^```[a-zA-Z]*\s*\n?/, '')
+    .replace(/```\s*$/, '')
+    .trim()
+}
+
+/**
+ * 判断是否为接口不支持工具调用的错误
+ * @param {any} e 异常
+ * @returns {boolean} 不支持工具调用时返回 true
+ */
+function isToolsUnsupportedError(e: any): boolean {
+  const text = String(e?.message || '')
+  return /HTTP 4\d\d/.test(text) && /tool|function|unsupported|not support|不支持/i.test(text)
+}
+
+/**
+ * 执行一次工具调用：按辅助提示词再请求一次，失败时把原因交回模型继续
+ * @param {Map<string, AuxPromptTool>} toolMap 工具名到辅助提示词的映射
+ * @param {AiChatToolCall} call 模型发起的工具调用
+ * @returns {Promise<string>} 回填给模型的工具结果
+ */
+async function runAuxTool(toolMap: Map<string, AuxPromptTool>, call: AiChatToolCall): Promise<string> {
+  const tool = toolMap.get(call.function.name)
+  if (!tool) return `工具 ${call.function.name} 不存在，请直接输出审查结论`
+  let args: any = {}
+  try {
+    args = JSON.parse(call.function.arguments || '{}')
+  } catch {
+    args = {}
+  }
+  const input = String(args?.input ?? args?.steps ?? args?.content ?? '').trim()
+  if (!input) return '缺少 input 参数，请把步骤放进 input 后重新调用'
+  try {
+    const { text } = await aiChat({ prompt: fillAuxPrompt(tool.prompt, input) })
+    return stripCodeFence(text) || '工具没有返回内容'
+  } catch (e: any) {
+    return `工具执行失败：${e?.message || e}`
+  }
+}
+
+/**
+ * 工具模式审查：反复请求直到模型不再调用工具，每轮把工具结果回填进消息
+ * @param {string} prompt 主提示词（已替换占位符）
+ * @param {AuxPromptTool[]} auxTools 辅助提示词工具
+ * @returns {Promise<{ conclusion: string; reasoning: string }>} 审查结论与各轮思考过程
+ */
+async function reviewWithTools(
+  prompt: string,
+  auxTools: AuxPromptTool[],
+): Promise<{ conclusion: string; reasoning: string }> {
+  const toolMap = new Map(auxTools.map((tool) => [tool.name, tool]))
+  const toolDefs = buildToolDefs(auxTools)
+  // 工具要求放在用户消息末尾，主提示词里原有的画图要求之后读，避免模型自己直接编 Mermaid
+  const messages: AiChatMessage[] = [{ role: 'user', content: `${prompt}\n\n${TOOL_MODE_INSTRUCTION}` }]
+  const reasoning: string[] = []
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const resp = await aiChat({ messages, tools: toolDefs })
+    if (resp.reasoning) reasoning.push(resp.reasoning)
+    const calls = resp.toolCalls ?? []
+    if (!calls.length) return { conclusion: resp.text, reasoning: reasoning.join('\n\n') }
+    messages.push({ role: 'assistant', content: resp.text || '', tool_calls: calls })
+    for (const call of calls) {
+      messages.push({ role: 'tool', tool_call_id: call.id, content: await runAuxTool(toolMap, call) })
+    }
+  }
+  throw new Error(`AI 审查超过 ${MAX_TOOL_ROUNDS} 轮工具调用，已中止`)
+}
+
 // 今天日期，YYYY-MM-DD
 function todayText(): string {
   const d = new Date()
@@ -105,7 +257,8 @@ function dateRangeText(remote: any): string {
 }
 
 /**
- * 对单条任务执行 AI 审查：读取模块提示词模板，任务上下文替换占位符后调用 AI 通道
+ * 对单条任务执行 AI 审查：读取模块提示词模板，任务上下文替换占位符后调用 AI 通道；
+ * 配置了辅助提示词时按工具模式多轮请求，由模型决定何时调用工具补流程图
  * @param {TaskDetailResult} result 任务详情（remote 含平台原始数据）
  * @param {string | null} commentText 评论区文本，null 表示取数异常
  * @param {{ handlerName?: string; departmentName?: string; taskDate?: string }} expected 设置中的预期处理人、所属部门与文本任务日期（平台无起止日期时兜底）
@@ -138,8 +291,21 @@ async function runAiReview(
     comments: toPlainText(commentText || '').slice(0, MAX_CONTEXT_CHARS),
   }
   const prompt = fillPrompt(template, ctx)
-  const { text, reasoning } = await aiChat(prompt)
-  return { conclusion: text, prompt, reasoning }
+  const auxTools = await loadAuxPromptTools()
+  // 没有配置辅助提示词时仍按单轮审查
+  if (!auxTools.length) {
+    const { text, reasoning } = await aiChat({ prompt })
+    return { conclusion: text, prompt, reasoning }
+  }
+  try {
+    const { conclusion, reasoning } = await reviewWithTools(prompt, auxTools)
+    return { conclusion, prompt, reasoning }
+  } catch (e: any) {
+    // 接口不支持工具调用时退回单轮审查，保持原有行为
+    if (!isToolsUnsupportedError(e)) throw e
+    const { text, reasoning } = await aiChat({ prompt })
+    return { conclusion: text, prompt, reasoning }
+  }
 }
 
 // #endregion

@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 13:30:00
+ * @LastEditTime: 2026-11-06 12:01:00
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: 描述
  */
@@ -65,9 +65,50 @@ export interface CheckCommentsParams {
   cookie: string
 }
 
+// 对话消息，支持多轮与工具调用回填（OpenAI 兼容格式）
+export interface AiChatMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content?: string | null
+  // 模型要求调用的工具
+  tool_calls?: AiChatToolCall[]
+  // 工具结果对应的调用 id
+  tool_call_id?: string
+}
+
+export interface AiChatToolCall {
+  id: string
+  type: 'function'
+  function: {
+    name: string
+    // 参数为 JSON 字符串，由调用方解析
+    arguments: string
+  }
+}
+
+export interface AiChatTool {
+  type: 'function'
+  function: {
+    name: string
+    description?: string
+    // JSON Schema 格式的参数定义
+    parameters?: Record<string, unknown>
+  }
+}
+
 export interface AiChatParams {
-  // 占位符替换后的最终提示词
-  prompt: string
+  // 单轮调用的最终提示词，与 messages 二选一
+  prompt?: string
+  // 多轮调用的完整消息列表，优先于 prompt
+  messages?: AiChatMessage[]
+  // 可用工具定义，不传时按纯文本对话
+  tools?: AiChatTool[]
+}
+
+export interface AiChatResult {
+  text: string
+  reasoning?: string
+  // 模型本轮要求调用的工具，为空表示对话结束
+  toolCalls?: AiChatToolCall[]
 }
 
 export interface OpenFileParams {
@@ -149,7 +190,7 @@ export interface IpcApi {
   checkComments: (params: CheckCommentsParams) => Promise<ActivitiesResponse>
 
   // AI 通用对话（连接配置统一，传最终提示词）
-  aiChat: (params: AiChatParams) => Promise<{ text: string; reasoning?: string }>
+  aiChat: (params: AiChatParams) => Promise<AiChatResult>
 
   fetchNotifications: (params: FetchNotificationsParams) => Promise<NotificationsResponse>
   // 主进程返回 { success, data } 结构
