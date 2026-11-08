@@ -549,6 +549,7 @@ body {
   -webkit-backdrop-filter: blur(var(--app-glass-blur)) !important;
 }
 .el-dialog {
+  --el-dialog-margin-top: 2vh;
   border-radius: var(--app-radius-xl) !important;
 }
 .el-drawer {
