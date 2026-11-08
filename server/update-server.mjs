@@ -23,10 +23,11 @@ const CHECK_NOTES = String(process.env.UPDATE_NOTES || '').trim()
 
 const CHECK_PATH = '/api/update/check'
 const DOWNLOAD_PREFIX = '/api/update/download/'
+const LATEST_YML_PATH = '/latest.yml'
 const VERSION_PATTERN = /(\d+\.\d+\.\d+(?:\.\d+)?)/
 
-// MD5 缓存，文件修改时间与大小不变时直接复用
-const md5Cache = new Map()
+// 哈希缓存，文件修改时间与大小不变时直接复用
+const hashCache = new Map()
 
 // 找出修改时间最新的 exe 安装包
 function findLatestInstaller() {
@@ -46,19 +47,23 @@ function findLatestInstaller() {
   return latest
 }
 
-// 计算文件 MD5，按修改时间与大小命中缓存
-function md5File(filePath, mtimeMs, size) {
-  const cached = md5Cache.get(filePath)
-  if (cached && cached.mtimeMs === mtimeMs && cached.size === size) return Promise.resolve(cached.md5)
+// 计算文件的 MD5 与 SHA-512，一次读取同时算出两个，按修改时间与大小命中缓存
+function hashFile(filePath, mtimeMs, size) {
+  const cached = hashCache.get(filePath)
+  if (cached && cached.mtimeMs === mtimeMs && cached.size === size) return Promise.resolve(cached)
   return new Promise((resolvePromise, reject) => {
-    const hash = createHash('md5')
+    const md5 = createHash('md5')
+    const sha512 = createHash('sha512')
     const stream = createReadStream(filePath)
-    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('data', (chunk) => {
+      md5.update(chunk)
+      sha512.update(chunk)
+    })
     stream.on('error', reject)
     stream.on('end', () => {
-      const md5 = hash.digest('hex')
-      md5Cache.set(filePath, { mtimeMs, size, md5 })
-      resolvePromise(md5)
+      const hashes = { mtimeMs, size, md5: md5.digest('hex'), sha512: sha512.digest('base64') }
+      hashCache.set(filePath, hashes)
+      resolvePromise(hashes)
     })
   })
 }
@@ -85,15 +90,47 @@ async function buildUpdateInfo(req) {
   if (!installer) throw new Error(`安装包目录里没有 exe 文件: ${PACKAGE_DIR}`)
   const version = VERSION_OVERRIDE || parseVersion(installer.fileName)
   if (!version) throw new Error(`安装包文件名里没有版本号，请改名或设置 UPDATE_VERSION: ${installer.fileName}`)
-  const md5 = await md5File(installer.filePath, installer.mtimeMs, installer.size)
+  const hashes = await hashFile(installer.filePath, installer.mtimeMs, installer.size)
   return {
     version,
     url: `${publicBaseUrl(req)}${DOWNLOAD_PREFIX}${encodeURIComponent(installer.fileName)}`,
-    md5,
+    md5: hashes.md5,
+    sha512: hashes.sha512,
     size: installer.size,
     notes: CHECK_NOTES || `测试更新包 ${installer.fileName}`,
     file: installer.fileName,
+    releaseDate: new Date(installer.mtimeMs).toISOString(),
   }
+}
+
+// 按最新安装包拼出 electron-updater 用的 latest.yml，字段与 electron-builder 生成的清单一致
+function buildLatestYml(info) {
+  return [
+    `version: ${info.version}`,
+    'files:',
+    `  - url: ${info.file}`,
+    `    sha512: '${info.sha512}'`,
+    `    size: ${info.size}`,
+    `path: ${info.file}`,
+    `sha512: '${info.sha512}'`,
+    `releaseDate: '${info.releaseDate}'`,
+    '',
+  ].join('\n')
+}
+
+// 响应 latest.yml
+function sendLatestYml(req, res, content) {
+  const body = Buffer.from(content, 'utf-8')
+  res.writeHead(200, {
+    'Content-Type': 'text/yaml; charset=utf-8',
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store',
+  })
+  if (req.method === 'HEAD') {
+    res.end()
+    return
+  }
+  res.end(body)
 }
 
 // 响应 JSON
@@ -225,6 +262,16 @@ const server = createServer(async (req, res) => {
         return
       }
       sendPackageFile(req, res, fileName, true)
+      return
+    }
+    // electron-updater 固定取 latest.yml，内容按目录里最新的 exe 实时生成，
+    // 目录里放的静态 latest.yml 不再参与，避免换了安装包忘了换清单
+    if (pathname === LATEST_YML_PATH) {
+      if (method !== 'GET' && method !== 'HEAD') {
+        sendJson(res, 405, { error: '只支持 GET 请求' })
+        return
+      }
+      sendLatestYml(req, res, buildLatestYml(await buildUpdateInfo(req)))
       return
     }
     // 更新源目录：electron-updater 按 latest.yml 里的文件名直取安装包与 blockmap

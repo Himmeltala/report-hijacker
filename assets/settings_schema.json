@@ -69,7 +69,7 @@
             "type": "text",
             "default": "https://api.deepseek.com/v1",
             "depends_on": "ai.enabled",
-            "description": "OpenAI 兼容的 chat completions 接口地址，支持 DeepSeek、公司内部网关等，如 https://api.deepseek.com/v1"
+            "description": "只适配 OpenAI 兼容协议：程序会自动在该地址后拼 /chat/completions，所以请填到 /v1 这一级，如 https://api.deepseek.com/v1、https://api.xiaomimimo.com/v1。Anthropic 兼容端点（如 https://api.xiaomimimo.com/anthropic）走的是 /v1/messages 协议，本程序不支持，填了会返回 404"
           },
           {
             "key": "ai.apiKey",
