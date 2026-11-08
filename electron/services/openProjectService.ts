@@ -12,6 +12,7 @@ import type { ApiClient } from '@electron/services/apiClient'
 import type { NotificationElement } from '@/types/api'
 import { extractWpId } from '@electron/utils'
 import { mapWithConcurrency } from '@electron/concurrency'
+import { getErrorMessage } from '@/utils/error'
 
 // 工作包详情补全请求的并发上限，防止大批量通知打爆平台接口
 const DETAIL_CONCURRENCY = 10
@@ -26,8 +27,9 @@ const DETAIL_TIMEOUT_MS = 10_000
 const MARK_READ_CONCURRENCY = 5
 
 // 判断是否为请求超时（AbortSignal.timeout 抛 TimeoutError）
-function isTimeoutError(e: any): boolean {
-  return e?.name === 'TimeoutError' || /aborted due to timeout|timeout/i.test(String(e?.message || ''))
+function isTimeoutError(e: unknown): boolean {
+  const err = e as { name?: unknown; message?: unknown } | null | undefined
+  return err?.name === 'TimeoutError' || /aborted due to timeout|timeout/i.test(String(err?.message || ''))
 }
 
 // 逐条标记已读：这套部署的集合接口 read_ian 不可用，定向标记只能走单条
@@ -48,8 +50,8 @@ export function setupOpenProjectIpc(api: ApiClient): void {
       // 透传完整原始 API 响应，不裁剪字段
       const remote = await api.getWorkPackage(taskId, cookie)
       return { serTaskId: taskId, remote }
-    } catch (e: any) {
-      return { serTaskId: taskId, serError: `获取任务详情失败: ${e.message}` }
+    } catch (e) {
+      return { serTaskId: taskId, serError: `获取任务详情失败: ${getErrorMessage(e)}` }
     }
   })
 
@@ -60,9 +62,9 @@ export function setupOpenProjectIpc(api: ApiClient): void {
     try {
       // 透传完整原始 API 响应，不裁剪字段
       return await api.get(`/api/v3/work_packages/${taskId}/activities`, cookie)
-    } catch (e: any) {
+    } catch (e) {
       // 404 表示任务无活动记录，返回空数据
-      if (String(e.message).includes('404')) {
+      if (getErrorMessage(e).includes('404')) {
         return { _type: 'Collection', total: 0, count: 0, _embedded: { elements: [] }, _links: {} }
       }
       throw e
@@ -89,7 +91,7 @@ export function setupOpenProjectIpc(api: ApiClient): void {
         cookie,
         { timeoutMs: LIST_TIMEOUT_MS },
       )
-    } catch (e: any) {
+    } catch (e) {
       if (isTimeoutError(e)) throw new Error('通知列表请求超时（60 秒），平台响应较慢，请稍后重试')
       throw e
     }
@@ -160,8 +162,8 @@ export function setupOpenProjectIpc(api: ApiClient): void {
     await mapWithConcurrency(ids, MARK_READ_CONCURRENCY, async (id: number) => {
       try {
         await markOneRead(api, id, cookie)
-      } catch (e: any) {
-        console.error(`[通知] 标记已读失败 ID=${id}:`, e.message)
+      } catch (e) {
+        console.error(`[通知] 标记已读失败 ID=${id}:`, getErrorMessage(e))
         failed.push(id)
       }
     })

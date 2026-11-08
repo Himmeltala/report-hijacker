@@ -24,7 +24,7 @@
       v-model="filters"
       :tasks="allDisplayTasks"
       :searching="searching"
-      @search="onSearch"
+      @search="handleSearch"
       @restored="onFilterRestored"
     />
 
@@ -55,10 +55,10 @@
       <span class="stat-item"
         >其他 <strong>{{ stats.evaluationOther }}</strong></span
       >
-      <el-button text class="stats-detail-btn" @click="showStatsDrawer = true">
+      <el-button text class="stats-detail-btn" @click="openStatsDetail">
         较上期 <el-icon><DArrowRight /></el-icon>
       </el-button>
-      <el-button text class="stats-heatmap-btn" @click="showHeatmapDrawer = true">
+      <el-button text class="stats-heatmap-btn" @click="statsOverviewModal.open()">
         <el-icon><TrendCharts /></el-icon>数据统计
       </el-button>
     </div>
@@ -245,49 +245,40 @@
         />
       </div>
     </div>
-
-    <el-drawer v-model="showStatsDrawer" size="480px" direction="rtl">
-      <template #header>
-        <span>统计详情</span>
-        <span class="drawer-subtitle" v-if="prevRangeLabel">上期: {{ prevRangeLabel }}</span>
-      </template>
-      <div class="drawer-resize-handle" ref="statsResizeHandle" @mousedown="statsResizeMousedown"></div>
-      <CompareWithLastDrawer v-if="showStatsDrawer" :chart-data="chartData" :detail-rows="detailRows" />
-    </el-drawer>
-
-    <el-drawer v-model="showHeatmapDrawer" size="640px" direction="rtl">
-      <template #header>
-        <span>数据统计</span>
-      </template>
-      <div class="drawer-resize-handle" ref="heatmapResizeHandle" @mousedown="heatmapResizeMousedown"></div>
-      <StatsOverviewDrawer v-if="showHeatmapDrawer" />
-    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 // #region 引入
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, reactive, watch } from 'vue'
+import { debounce } from 'lodash-es'
 import { ElMessageBox } from 'element-plus'
 import { DArrowRight, TrendCharts } from '@element-plus/icons-vue'
-import { useDrawerResize } from '@/composables/useDrawerResize'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
-import { reviewBatch, isAiReviewPassed, type TaskToValidate } from '@/services/taskValidation'
-import { computeTaskStats } from '@/services/taskStats'
+import { reviewBatch, isAiReviewPassed, toTaskToValidate, type TaskToValidate } from '@/services/taskValidation'
+import { computeTaskStats, type TaskStats } from '@/services/taskStats'
 import { flushHistoryChanges } from '@/services/historyPersistence'
 import { compareTaskOrder, type TaskOrderFields } from '@/services/taskOrder'
 import { taskMatchesKeyword } from '@/services/taskSearch'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
 import { maybeShowSysNotification } from '@/utils/sysNotification'
 import { ipc } from '@/utils/ipc'
+import { getErrorMessage } from '@/utils/error'
 import { createAutoSyncSchedule } from '@schedules/renderer/autoSyncSchedule'
-import CompareWithLastDrawer from '@/views/HistoryTask/components/CompareWithLastDrawer.vue'
-import StatsOverviewDrawer from '@/views/HistoryTask/components/StatsOverviewDrawer.vue'
 import FilterBar, { createDefaultFilterState, type FilterState } from '@/views/HistoryTask/components/FilterBar.vue'
 import ToolBar, { type ToolbarState } from '@/views/HistoryTask/components/ToolBar.vue'
-import type { HistoryDay, HistoryTaskItem } from '@/types/ipc'
+import type {
+  DatedTask,
+  HistoryDay,
+  HistoryTaskItem,
+  PostponeForm,
+  TaskPriorityForm,
+  TaskTimeLimitForm,
+} from '@/types/history'
+import type { CompareChartItem, CompareDetailRow } from '@/types/chart'
+import type { TaskDetailResult } from '@/types/task'
 import {
   statusTagType,
   evaluationTagType,
@@ -306,9 +297,9 @@ const logStore = useLogStore()
 // #endregion
 
 // #region 响应式状态
-// 筛选栏编辑中的条件，点击搜索后才生效
+// 筛选栏编辑中的条件，变更后防抖自动查询，点击搜索立即生效
 const filters = reactive<FilterState>(createDefaultFilterState())
-// 已生效的筛选条件快照，列表与查询以此为准，条件变更不立即触发搜索
+// 已生效的筛选条件快照，列表与查询以此为准，自动或手动搜索时同步
 const appliedFilters = reactive<FilterState>(createDefaultFilterState())
 const loadedDays = shallowRef<HistoryDay[]>([])
 const prevDays = shallowRef<HistoryDay[]>([])
@@ -318,25 +309,6 @@ const syncing = ref(false)
 const searching = ref(false)
 const syncingAll = ref(false)
 const selection = ref<HistoryTaskItem[]>([])
-const showStatsDrawer = ref(false)
-const showHeatmapDrawer = ref(false)
-
-// 抽屉拖拽手柄元素引用，用于打开抽屉时恢复上次保存的宽度
-const statsResizeHandle = ref<HTMLElement | null>(null)
-const heatmapResizeHandle = ref<HTMLElement | null>(null)
-
-// #region 抽屉拖拽调宽，宽度持久化到本地存储
-const { handleResizeMousedown: statsResizeMousedown } = useDrawerResize(
-  showStatsDrawer,
-  { storageKey: 'historyStatsDrawerWidth' },
-  statsResizeHandle,
-)
-const { handleResizeMousedown: heatmapResizeMousedown } = useDrawerResize(
-  showHeatmapDrawer,
-  { storageKey: 'historyHeatmapDrawerWidth' },
-  heatmapResizeHandle,
-)
-// #endregion
 const isExporting = ref(false)
 const checking = ref(false)
 const checkingAll = ref(false)
@@ -358,47 +330,66 @@ const abortCheck = ref(false)
 // #endregion
 
 // #region 函数式弹窗
-const editModal = useModal({
+const editModal = useModal<{ task: DatedTask | null }, { confirm: (updated: DatedTask) => void }>({
   component: () => import('@/views/HistoryTask/modals/EditTaskModal.vue'),
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
 
-const detailModal = useModal({
+const detailModal = useModal<{ result: TaskDetailResult | null; aiConclusion?: string | null }>({
   component: () => import('@/modals/TaskDetailModal.vue'),
   autoCloseEvents: ['close'],
 })
 
-const postponeModal = useModal({
+const postponeModal = useModal<{ form: PostponeForm | null }, { confirm: (form: PostponeForm) => void }>({
   component: () => import('@/views/HistoryTask/modals/PostponeModal.vue'),
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
 
-const priorityModal = useModal({
+const priorityModal = useModal<{ form: TaskPriorityForm | null }, { confirm: (form: TaskPriorityForm) => void }>({
   component: () => import('@/views/HistoryTask/modals/PriorityModal.vue'),
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
 
-const timeLimitModal = useModal({
+const timeLimitModal = useModal<{ form: TaskTimeLimitForm | null }, { confirm: (form: TaskTimeLimitForm) => void }>({
   component: () => import('@/views/HistoryTask/modals/TimeLimitModal.vue'),
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
-// #endregion
 
-// #region 类型定义
-interface DisplayTask extends HistoryTaskItem {
-  serDate: string
+const statsOverviewModal = useModal<Record<string, never>>({
+  component: () => import('@/views/HistoryTask/modals/StatsOverviewModal.vue'),
+  autoCloseEvents: ['close'],
+})
+
+const statsDetailModal = useModal<{
+  prevRangeLabel: string
+  chartData: CompareChartItem[]
+  detailRows: CompareDetailRow[]
+}>({
+  component: () => import('@/views/HistoryTask/modals/StatsDetailModal.vue'),
+  autoCloseEvents: ['close'],
+})
+
+/**
+ * 打开统计详情弹窗，传入上期区间标签与当期对比数据
+ */
+function openStatsDetail() {
+  statsDetailModal.open({
+    prevRangeLabel: prevRangeLabel.value,
+    chartData: chartData.value,
+    detailRows: detailRows.value,
+  })
 }
 // #endregion
 
 // #region 计算属性
-const allDisplayTasks = shallowRef<DisplayTask[]>([])
+const allDisplayTasks = shallowRef<DatedTask[]>([])
 
 // 重新计算 allDisplayTasks：按平台状态、平台类型排序
 function rebuildAllDisplayTasks() {
-  const tasks: DisplayTask[] = []
+  const tasks: DatedTask[] = []
   for (const day of loadedDays.value) {
     for (const t of day.tasks) {
-      tasks.push(t as DisplayTask)
+      tasks.push(t as DatedTask)
     }
   }
   tasks.sort((a, b) => compareTaskOrder(toOrderFields(a), toOrderFields(b)))
@@ -407,10 +398,10 @@ function rebuildAllDisplayTasks() {
 
 /**
  * 取排序字段：状态与类型来自平台数据，日期与序号来自本地记录
- * @param {DisplayTask} t 任务
+ * @param {DatedTask} t 任务
  * @returns {TaskOrderFields} 排序字段
  */
-function toOrderFields(t: DisplayTask): TaskOrderFields {
+function toOrderFields(t: DatedTask): TaskOrderFields {
   return {
     status: t.remote?._embedded?.status?.name,
     type: t.remote?._embedded?.type?.name,
@@ -496,16 +487,16 @@ function onFilterRestored() {
   computeStatsCache()
 }
 
-const matchedTasks = computed<DisplayTask[]>(() => {
+const matchedTasks = computed<DatedTask[]>(() => {
   return allDisplayTasks.value.filter((t) => matchesKeyword(t) && matchesFilters(t))
 })
 
-const activeTasks = computed<DisplayTask[]>(() => matchedTasks.value.filter((t) => !t.serPostponed))
+const activeTasks = computed<DatedTask[]>(() => matchedTasks.value.filter((t) => !t.serPostponed))
 
 // 同步与 AI 审查范围包含延期任务，仅统计、导出、删除排除
-const syncableTasks = computed<DisplayTask[]>(() => matchedTasks.value)
+const syncableTasks = computed<DatedTask[]>(() => matchedTasks.value)
 
-const displayTasks = computed<DisplayTask[]>(() => matchedTasks.value)
+const displayTasks = computed<DatedTask[]>(() => matchedTasks.value)
 
 const selectedTasks = computed(() => selection.value)
 
@@ -530,22 +521,9 @@ const toolbarState = computed<ToolbarState>(() => ({
 }))
 
 const statsCache = shallowRef<{
-  stats: {
-    totalTasks: number
-    totalSelfHours: number
-    totalEstHours: number
-    totalScore: number
-    evaluationGood: number
-    evaluationPass: number
-    evaluationOther: number
-  }
-  detailRows: Array<{
-    label: string
-    prev: string | number
-    curr: string | number
-    growth: number | null
-  }>
-  chartData: Array<{ label: string; prev: number; curr: number }>
+  stats: TaskStats
+  detailRows: CompareDetailRow[]
+  chartData: CompareChartItem[]
 } | null>(null)
 
 function computeStatsCache() {
@@ -647,7 +625,7 @@ function pct(cur: number, prev: number): number | null {
   return prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null
 }
 
-function openPostponeDialog(task: DisplayTask) {
+function openPostponeDialog(task: DatedTask) {
   const formData = {
     postponed: task.serPostponed || false,
     postponedReason: task.serPostponedReason || '',
@@ -655,7 +633,7 @@ function openPostponeDialog(task: DisplayTask) {
   postponeModal.open(
     { form: formData },
     {
-      confirm: (form: { postponed: boolean; postponedReason: string }) => {
+      confirm: (form: PostponeForm) => {
         task.serPostponed = form.postponed
         task.serPostponedReason = form.postponedReason
         markDirty()
@@ -665,14 +643,14 @@ function openPostponeDialog(task: DisplayTask) {
   )
 }
 
-function openPriorityDialog(task: DisplayTask) {
+function openPriorityDialog(task: DatedTask) {
   const formData = {
     priority: task.serPriority || null,
   }
   priorityModal.open(
     { form: formData },
     {
-      confirm: (form: { priority: 'high' | 'medium' | 'low' | null }) => {
+      confirm: (form: TaskPriorityForm) => {
         task.serPriority = form.priority
         markDirty()
         logStore.addLog('success', '已更新执行优先级')
@@ -681,14 +659,14 @@ function openPriorityDialog(task: DisplayTask) {
   )
 }
 
-function openTimeLimitDialog(task: DisplayTask) {
+function openTimeLimitDialog(task: DatedTask) {
   const formData = {
     timeLimit: task.serTimeLimit || null,
   }
   timeLimitModal.open(
     { form: formData },
     {
-      confirm: (form: { timeLimit: 'today' | 'temp' | null }) => {
+      confirm: (form: TaskTimeLimitForm) => {
         task.serTimeLimit = form.timeLimit
         markDirty()
         logStore.addLog('success', '已更新限时任务')
@@ -792,11 +770,71 @@ async function loadRange() {
   computeStatsCache()
 }
 
+// #region 筛选条件变更自动搜索
+
+/**
+ * 生成查询相关筛选条件的快照键，展开状态等界面字段不参与
+ * @param {FilterState} state 筛选条件
+ */
+function buildQueryKey(state: FilterState): string {
+  return JSON.stringify([
+    state.dateRange?.[0]?.getTime() ?? null,
+    state.dateRange?.[1]?.getTime() ?? null,
+    state.keyword,
+    state.searchScope,
+    state.filterPriority,
+    state.filterPostponed,
+    state.filterSyncStatus,
+    state.filterStatus,
+    state.filterType,
+    state.filterEval,
+    state.filterAddedDate,
+    state.filterProjects,
+    state.filterHandlers,
+    state.filterTitle,
+    state.filterUrl,
+  ])
+}
+
+// 编辑中的条件与已生效条件的快照，两者不同才需要重新查询
+const queryParamsKey = computed(() => buildQueryKey(filters))
+const appliedQueryKey = computed(() => buildQueryKey(appliedFilters))
+
+// 搜索进行中再次触发时的排队标记
+let searchQueued = false
+
+const autoSearch = debounce(() => {
+  if (queryParamsKey.value === appliedQueryKey.value) return
+  onSearch()
+}, 500)
+
+watch(queryParamsKey, () => {
+  // 回显、同步生效条件等场景下两者一致，不触发查询
+  if (queryParamsKey.value === appliedQueryKey.value) return
+  autoSearch()
+})
+
+onBeforeUnmount(() => autoSearch.cancel())
+
+/**
+ * 手动搜索立即执行，并取消尚未触发的防抖搜索
+ */
+function handleSearch() {
+  autoSearch.cancel()
+  onSearch()
+}
+
+// #endregion
+
 /**
  * 执行搜索：先同步筛选栏条件为生效条件，有关键字且选全部历史时查全量，其余按日期范围取数
  */
 async function onSearch() {
-  if (searching.value) return
+  // 搜索进行中再次触发时排队，本次结束后按最新条件补查一次
+  if (searching.value) {
+    searchQueued = true
+    return
+  }
   searching.value = true
   try {
     syncAppliedFilters()
@@ -822,6 +860,10 @@ async function onSearch() {
     restartAutoSync(true)
   } finally {
     searching.value = false
+    if (searchQueued) {
+      searchQueued = false
+      onSearch()
+    }
   }
 }
 
@@ -833,7 +875,7 @@ onMounted(async () => {
   const [, bt, backupVal, st] = await Promise.all([
     loadRange(),
     ipc.storeGet('lastBackupTime'),
-    ipc.getSetting('history.backupEnabled'),
+    ipc.getSetting<boolean>('history.backupEnabled'),
     ipc.storeGet('lastAutoSyncTime'),
   ])
   // 数据就位后再回显分页，避免 loadRange 的页码归位覆盖上次记录
@@ -960,8 +1002,8 @@ async function flushChanges(silent = false) {
 async function handleSaveRange(silent = false) {
   try {
     await flushChanges(silent)
-  } catch (e: any) {
-    logStore.addLog('error', '保存失败: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '保存失败: ' + getErrorMessage(e))
   }
 }
 // #endregion
@@ -1115,16 +1157,7 @@ async function doAiReview(tasks: Array<{ task: HistoryTaskItem }>) {
     return { count: 0, passed: 0, failed: 0 }
   }
 
-  const ttv: TaskToValidate[] = tasks.map(({ task }) => ({
-    rawSeq: String(task.rawSeq),
-    rawProjectName: task.rawProjectName,
-    rawTitle: task.rawTitle,
-    rawScore: task.rawScore,
-    rawEstimatedHours: task.rawEstimatedHours,
-    rawRemark: task.rawRemark,
-    rawUrl: task.rawUrl,
-    taskDate: (task as any).serDate,
-  }))
+  const ttv: TaskToValidate[] = tasks.map(({ task }) => toTaskToValidate({ ...task, taskDate: (task as any).serDate }))
 
   let count = 0
   let passed = 0
@@ -1251,12 +1284,12 @@ function rebuildRaw(task: HistoryTaskItem): string {
   return `${task.rawSeq}.${task.rawProjectName}-【${task.rawTitle}-${task.rawHandler}】 ${task.rawUrl}${scoreBracket}`
 }
 
-function openEditDialog(row: DisplayTask) {
+function openEditDialog(row: DatedTask) {
   const task = JSON.parse(JSON.stringify(row))
   editModal.open(
     { task },
     {
-      confirm: (updated: DisplayTask) => {
+      confirm: (updated: DatedTask) => {
         for (const day of loadedDays.value) {
           const t = day.tasks.find((x) => x.serId === updated.serId)
           if (t) {
@@ -1367,8 +1400,8 @@ async function handleSync() {
     } else {
       logStore.addLog('warning', '同步已停止')
     }
-  } catch (e: any) {
-    logStore.addLog('error', '同步失败: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '同步失败: ' + getErrorMessage(e))
   } finally {
     syncing.value = false
   }
@@ -1410,11 +1443,11 @@ function mapExportTasks(tasks: HistoryTaskItem[]) {
       return true
     })
     .map((t) => ({
-      url: t.rawUrl,
-      projectName: t.rawProjectName,
-      title: t.rawTitle,
-      score: t.rawScore,
-      estimatedHours: t.rawEstimatedHours,
+      rawUrl: t.rawUrl,
+      rawProjectName: t.rawProjectName,
+      rawTitle: t.rawTitle,
+      rawScore: t.rawScore,
+      rawEstimatedHours: t.rawEstimatedHours,
     }))
 }
 
@@ -1451,8 +1484,8 @@ async function doExport(tasks: HistoryTaskItem[]) {
     } else {
       logStore.addLog('error', '导出失败: ' + (ret.error || ''))
     }
-  } catch (e: any) {
-    logStore.addLog('error', '导出异常: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '导出异常: ' + getErrorMessage(e))
   } finally {
     isExporting.value = false
   }
@@ -1487,7 +1520,7 @@ function doCopyTask(withEst: boolean) {
 async function handleBackupNow() {
   backingUp.value = true
   try {
-    const dirs = (await ipc.getSetting('history.backupDirectories')) || []
+    const dirs = (await ipc.getSetting<string[]>('history.backupDirectories')) || []
     const ret = await ipc.backupNow(JSON.parse(JSON.stringify(dirs)))
     if (ret?.success) {
       lastBackupTime.value = ret.time ? new Date(ret.time).toLocaleString() : new Date().toLocaleString()
@@ -1495,8 +1528,8 @@ async function handleBackupNow() {
     } else {
       logStore.addLog('warning', ret?.message || '备份失败')
     }
-  } catch (e: any) {
-    logStore.addLog('error', '备份异常: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '备份异常: ' + getErrorMessage(e))
   } finally {
     backingUp.value = false
   }
@@ -1511,8 +1544,8 @@ async function handleRestoreBackup() {
     } else {
       logStore.addLog('info', '备份目录无有效历史文件')
     }
-  } catch (e: any) {
-    logStore.addLog('error', '恢复失败: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '恢复失败: ' + getErrorMessage(e))
   }
 }
 // #endregion
@@ -1522,7 +1555,7 @@ async function runAutoSync() {
   if (autoSyncRunning.value) return
   if (!syncableTasks.value.length) return
 
-  const enabled = await ipc.getSetting('history.autoSyncEnabled')
+  const enabled = await ipc.getSetting<boolean>('history.autoSyncEnabled')
   if (!enabled) return
 
   autoSyncRunning.value = true
@@ -1543,8 +1576,8 @@ async function runAutoSync() {
       logStore.addLog('info', '自动审查: 开始审查范围内任务...')
       await handleAiReviewRange()
     }
-  } catch (e: any) {
-    logStore.addLog('error', '自动同步与审查异常: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '自动同步与审查异常: ' + getErrorMessage(e))
   } finally {
     selection.value = prevSelection
     autoSyncRunning.value = false
@@ -1554,12 +1587,12 @@ async function runAutoSync() {
 const autoSyncSchedule = createAutoSyncSchedule({
   isEligible: () => containsToday.value,
   isEnabled: async () => {
-    const enabled = await ipc.getSetting('history.autoSyncEnabled')
+    const enabled = await ipc.getSetting<boolean>('history.autoSyncEnabled')
     autoSyncEnabled.value = !!enabled
     return !!enabled
   },
   getIntervalMs: async () => {
-    const intervalMin = (await ipc.getSetting('history.autoSyncInterval')) || 5
+    const intervalMin = (await ipc.getSetting<number>('history.autoSyncInterval')) || 5
     return intervalMin * 60 * 1000
   },
   getLastRunAt: () => ipc.storeGet('lastAutoSyncTime'),
@@ -1677,33 +1710,10 @@ function handleCopyCmd(cmd: string) {
 .stats-detail {
   padding: 0 var(--app-space-2);
 }
-.drawer-subtitle {
-  margin-left: 8px;
-  font-size: var(--el-font-size-small);
-  color: var(--el-text-color-secondary);
-  font-weight: normal;
-}
 .pagination-bar {
   display: flex;
   justify-content: flex-end;
   padding: var(--app-space-2) var(--app-space-3);
   flex-shrink: 0;
-}
-</style>
-
-<!-- 抽屉拖拽调宽样式：抽屉 teleport 到 body 后 scoped 无法命中，须用非 scoped -->
-<style>
-.drawer-resize-handle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  cursor: ew-resize;
-  background: transparent;
-  z-index: 10;
-}
-.drawer-resize-handle:hover {
-  background: var(--el-color-primary-light-5);
 }
 </style>

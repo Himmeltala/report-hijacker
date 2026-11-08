@@ -31,24 +31,12 @@
 import { ref, computed } from 'vue'
 import { useChartRoll, getThemeTextColors, isDarkTheme } from '@/composables/useEcharts'
 import { getGlassTooltipStyle, tooltipRow } from '@/utils/color'
-
-interface DetailRow {
-  label: string
-  prev: string | number
-  curr: string | number
-  growth: number | null
-}
-
-interface ChartItem {
-  label: string
-  prev: number
-  curr: number
-}
+import type { CompareChartItem, CompareDetailRow } from '@/types/chart'
 
 const props = withDefaults(
   defineProps<{
-    chartData: ChartItem[]
-    detailRows: DetailRow[]
+    chartData: CompareChartItem[]
+    detailRows: CompareDetailRow[]
   }>(),
   { chartData: () => [], detailRows: () => [] },
 )
@@ -59,8 +47,8 @@ const safeData = computed(() => props.chartData || [])
 useChartRoll({
   chartRef,
   dataSource: safeData,
-  xAxis: (data: any) => (data || []).map((d: any) => d.label),
-  generateOption: (data: any) => {
+  xAxis: (data: CompareChartItem[]) => (data || []).map((d) => d.label),
+  generateOption: (data: CompareChartItem[]) => {
     if (!data || !data.length) return {}
     const colors = getThemeTextColors()
     return {

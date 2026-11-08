@@ -7,12 +7,11 @@
  * @Description: 任务关键字匹配，主进程查询与渲染端过滤共用同一套口径
  */
 
-export interface SearchableTask {
-  rawProjectName?: string
-  rawTitle?: string
+import type { RawTaskFields } from '@/types/task'
+
+/** 关键字匹配只看任务的可搜索文本字段，全部可选以兼容任意任务形状 */
+export type SearchableTask = Partial<Pick<RawTaskFields, 'rawProjectName' | 'rawTitle' | 'rawUrl' | 'rawRemark'>> & {
   rawHandler?: string
-  rawUrl?: string
-  rawRemark?: string
 }
 
 /**

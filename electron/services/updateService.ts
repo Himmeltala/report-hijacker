@@ -12,6 +12,7 @@ import { autoUpdater } from 'electron-updater'
 import { mkdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { sendToWindow, writeJsonAtomic } from '@electron/utils'
+import { getErrorMessage } from '@/utils/error'
 import type { AppSettings } from '@electron/services/settingsService'
 import type {
   UpdateApplyResult,
@@ -117,9 +118,9 @@ async function checkForUpdate(deps: UpdateDeps): Promise<UpdateCheckResult> {
     saveLastCheck(checkedAt)
     if (!hasUpdate) return { hasUpdate: false, checkedAt }
     return { hasUpdate: true, version: info?.version, checkedAt }
-  } catch (e: any) {
+  } catch (e) {
     saveLastCheck(checkedAt)
-    return { hasUpdate: false, error: e?.message || '检查更新失败', checkedAt }
+    return { hasUpdate: false, error: getErrorMessage(e, '检查更新失败'), checkedAt }
   }
 }
 
@@ -165,9 +166,9 @@ async function applyUpdate(deps: UpdateDeps): Promise<UpdateApplyResult> {
     await autoUpdater.downloadUpdate()
     autoUpdater.quitAndInstall()
     return { started: true }
-  } catch (e: any) {
+  } catch (e) {
     installing = false
-    return { started: false, error: e?.message || '更新失败' }
+    return { started: false, error: getErrorMessage(e, '更新失败') }
   }
 }
 

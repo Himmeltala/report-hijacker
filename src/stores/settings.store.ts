@@ -11,6 +11,7 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { AI_SETTING_KEYS } from '@/types/ai'
 import type { AppConfig } from '@/types/config'
 import { useLogStore } from '@/stores/log.store'
 
@@ -25,7 +26,7 @@ export const SETTING_KEY_MAP: Record<keyof AppConfig, string> = {
   groupRegex: 'parsing.groupRegex',
   apiBaseUrl: 'connection.apiBaseUrl',
   templatePath: 'export.templatePath',
-  aiEnabled: 'ai.enabled',
+  aiEnabled: AI_SETTING_KEYS.enabled,
 }
 
 // 反向映射：持久化键名 到 AppConfig 属性名

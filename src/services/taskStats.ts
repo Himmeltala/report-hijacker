@@ -8,6 +8,7 @@
  */
 
 import { convertIso8601ToHours } from '@/utils/parser'
+import type { RawWorkPackage } from '@/types/remote'
 
 // #region 类型定义
 
@@ -21,10 +22,8 @@ export interface TaskStats {
   evaluationOther: number
 }
 
-// 远程工作包数据的最小形状：customField 系列平台返回数字，也可能为字符串，字段类型与 RawWorkPackage 兼容
-export interface StatsRemote {
-  estimatedTime?: string
-  customField105?: string | number
+/** 远程工作包中统计用到的字段子集，字段类型与平台原始数据类型同源 */
+export type StatsRemote = Pick<RawWorkPackage, 'estimatedTime' | 'customField105'> & {
   _links?: {
     customField62?: {
       title?: string

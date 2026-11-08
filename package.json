@@ -13,6 +13,8 @@
     "preinstall": "node scripts/check-pnpm.cjs",
     "postinstall": "node scripts/install-electron.js",
     "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "vue-tsc --noEmit && vue-tsc --noEmit -p tsconfig.node.json && node scripts/clean-dist-electron.js && vite build",
     "preview": "vite preview",
     "update:server": "node server/update-server.mjs",
@@ -55,6 +57,7 @@
     "vite": "^8.1.0",
     "vite-plugin-electron": "^1.1.0",
     "vite-plugin-electron-renderer": "^1.0.0",
+    "vitest": "^5.1.0",
     "vue-tsc": "^3.3.5"
   }
 }

@@ -1,0 +1,31 @@
+/*
+ * @Author: zhengrenfu
+ * @Date: 2026-11-08
+ * @Description: 渲染层 AI 通道封装：统一调用主进程通道并读取 AI 配置项
+ */
+
+import type { AiChatParams, AiChatResult } from '@/types/ai'
+
+// #region 通用通道
+
+/**
+ * 调用统一 AI 通道
+ * @param {AiChatParams} params 单轮提示词或完整消息列表，可附带工具定义
+ * @returns {Promise<AiChatResult & { reasoning: string }>} 模型输出文本、思考过程与本轮工具调用，思考过程统一转为字符串
+ */
+export async function aiChat(params: AiChatParams): Promise<AiChatResult & { reasoning: string }> {
+  const ret = await window.electron.aiChat(params)
+  return { text: ret.text, reasoning: ret.reasoning ?? '', toolCalls: ret.toolCalls }
+}
+
+/**
+ * 读取某模块的 AI 配置项（提示词等按模块独立配置，键名带模块前缀）
+ * @param {string} key 完整设置键，如 ai.taskReview.prompt
+ * @returns {Promise<string>} 设置值，未配置返回空字符串
+ */
+export async function getAiSetting(key: string): Promise<string> {
+  const val = await window.electron.getSetting<unknown>(key)
+  return val === undefined || val === null ? '' : String(val)
+}
+
+// #endregion

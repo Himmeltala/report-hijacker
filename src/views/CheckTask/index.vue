@@ -178,7 +178,7 @@ import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
 import { parseTaskText, convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
-import { reviewBatch, isAiReviewPassed, type TaskToValidate } from '@/services/taskValidation'
+import { reviewBatch, isAiReviewPassed, toTaskToValidate, type TaskToValidate } from '@/services/taskValidation'
 import { computeTaskStats } from '@/services/taskStats'
 import type { TaskItem, TaskDetailResult } from '@/types/task'
 import { statusTagType, evaluationTagType, taskTypeTagType } from '@/utils/tag'
@@ -188,7 +188,7 @@ import MarkdownText from '@/components/MarkdownText.vue'
 const store = useSettingsStore()
 const logStore = useLogStore()
 
-const detailModal = useModal({
+const detailModal = useModal<{ result: TaskDetailResult | null; aiConclusion?: string | null }>({
   component: () => import('@/modals/TaskDetailModal.vue'),
   autoCloseEvents: ['close'],
 })
@@ -246,15 +246,7 @@ async function handleValidate() {
   detailResults.value = []
   aiConclusions.value = []
 
-  const ttv: TaskToValidate[] = parsedTasks.value.map((t) => ({
-    rawSeq: t.rawSeq,
-    rawProjectName: t.rawProjectName,
-    rawTitle: t.rawTitle,
-    rawScore: t.rawScore,
-    rawEstimatedHours: t.rawEstimatedHours,
-    rawRemark: t.rawRemark,
-    rawUrl: t.rawUrl,
-  }))
+  const ttv: TaskToValidate[] = parsedTasks.value.map(toTaskToValidate)
 
   try {
     const outcomes = await reviewBatch(

@@ -62,7 +62,7 @@ export const ipc: IpcApi = new Proxy({} as IpcApi, {
   get(_target, prop: string) {
     const api = window.electron
     if (!api) return undefined
-    const fn = (api as any)[prop]
+    const fn = api[prop as keyof IpcApi]
     if (typeof fn !== 'function') return fn
     return (...args: unknown[]) =>
       (fn as (...params: unknown[]) => unknown).apply(

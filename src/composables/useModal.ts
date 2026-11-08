@@ -11,21 +11,27 @@ import type { Component, AppContext } from 'vue'
 
 // #region 类型定义
 
-interface UseModalOptions {
+/** 弹窗事件监听集合，键为事件名（不含 on 前缀） */
+export type ModalEmitMap = Record<string, (...args: any[]) => void>
+
+/** 无具体类型时的弹窗 props 集合 */
+export type ModalProps = Record<string, unknown>
+
+export interface UseModalOptions<P extends object = ModalProps, E extends ModalEmitMap = ModalEmitMap> {
   // 组件定义或异步加载函数
   component: Component | (() => Promise<{ default: Component }>)
   // 静态 props，会与 open() 传入的 props 合并
-  props?: Record<string, any>
+  props?: P
   // 静态事件监听，会与 open() 传入的 emit 合并
-  emit?: Record<string, (...args: any[]) => void>
+  emit?: E
   // 触发后自动关闭弹窗的事件名列表
   autoCloseEvents?: string[]
   // 弹窗关闭回调（外部调 close、点遮罩、autoCloseEvents 均触发）
   onClose?: () => void
 }
 
-interface UseModalReturn {
-  open: (props?: Record<string, any>, emit?: Record<string, (...args: any[]) => void>) => Promise<void>
+export interface UseModalReturn<P extends object = ModalProps, E extends ModalEmitMap = ModalEmitMap> {
+  open: (props?: P, emit?: E) => Promise<void>
   close: () => void
 }
 
@@ -41,11 +47,13 @@ interface UseModalReturn {
  * @param options.autoCloseEvents - 触发后自动关闭的事件名列表，默认 ['cancel', 'close']
  * @param options.onClose - 统一关闭回调
  */
-export function useModal(options: UseModalOptions): UseModalReturn {
+export function useModal<P extends object = ModalProps, E extends ModalEmitMap = ModalEmitMap>(
+  options: UseModalOptions<P, E>,
+): UseModalReturn<P, E> {
   const {
     component,
-    props: staticProps = {},
-    emit: staticEmit = {},
+    props: staticProps = {} as P,
+    emit: staticEmit = {} as E,
     autoCloseEvents = ['cancel', 'close'],
     onClose,
   } = options
@@ -58,8 +66,8 @@ export function useModal(options: UseModalOptions): UseModalReturn {
   let pendingOpen = false
   let pendingClose = false
   let loadedComp: Component | null = null
-  let currentProps: Record<string, any> = {}
-  let currentEmit: Record<string, (...args: any[]) => void> = {}
+  let currentProps: P = {} as P
+  let currentEmit: E = {} as E
   let destroyTimer: ReturnType<typeof setTimeout> | null = null
   let animateTimer: ReturnType<typeof setTimeout> | null = null
   let generation = 0
@@ -75,9 +83,7 @@ export function useModal(options: UseModalOptions): UseModalReturn {
    * 合并静态事件与动态事件，生成组件 props 中的 onXxx 处理器
    * @param {object} dynamicEmit 动态事件监听
    */
-  function getEventHandlers(
-    dynamicEmit: Record<string, (...args: any[]) => void> = {},
-  ): Record<string, (...args: any[]) => void> {
+  function getEventHandlers(dynamicEmit: E = {} as E): Record<string, (...args: any[]) => void> {
     const merged = { ...staticEmit, ...dynamicEmit }
     const handlers: Record<string, (...args: any[]) => void> = {}
 
@@ -145,7 +151,7 @@ export function useModal(options: UseModalOptions): UseModalReturn {
    * @param {boolean} visible 是否可见
    * @param {object} dynamicEmit 动态事件监听
    */
-  function renderModal(visible: boolean, dynamicEmit: Record<string, (...args: any[]) => void> = {}) {
+  function renderModal(visible: boolean, dynamicEmit: E = {} as E) {
     if (!container || !loadedComp) return
 
     const vnode = h(loadedComp, {
@@ -192,15 +198,12 @@ export function useModal(options: UseModalOptions): UseModalReturn {
 
   // #region 打开弹窗
 
-  async function open(
-    propsOrOptions?: Record<string, any>,
-    emitOptions?: Record<string, (...args: any[]) => void>,
-  ): Promise<void> {
-    let newProps: Record<string, any> = {}
-    let newEmit: Record<string, (...args: any[]) => void> = {}
+  async function open(propsOrOptions?: P, emitOptions?: E): Promise<void> {
+    let newProps: P = {} as P
+    let newEmit: E = {} as E
 
     if (emitOptions !== undefined) {
-      newProps = propsOrOptions ?? {}
+      newProps = propsOrOptions ?? ({} as P)
       newEmit = emitOptions
     } else if (propsOrOptions) {
       newProps = propsOrOptions
@@ -234,7 +237,7 @@ export function useModal(options: UseModalOptions): UseModalReturn {
     try {
       const resolved =
         typeof component === 'function' ? await (component as () => Promise<{ default: Component }>)() : component
-      loadedComp = (resolved as any).default ?? resolved
+      loadedComp = (resolved as { default?: Component }).default ?? resolved
     } catch (e) {
       loading = false
       pendingOpen = false

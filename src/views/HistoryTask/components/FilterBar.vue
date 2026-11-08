@@ -4,7 +4,7 @@
  * @LastEditors: Himmeltala
  * @LastEditTime: 2026-11-04 14:21:53
  * @FilePath: /src/views/HistoryTask/components/FilterBar.vue
- * @Description: 历史任务筛选栏组件，常驻区做粗略筛选，展开区做精细筛选；条件变更不触发查询，点击搜索按钮后才执行
+ * @Description: 历史任务筛选栏组件，常驻区做粗略筛选，展开区做精细筛选；条件变更后由父组件防抖自动查询，也可点击搜索立即执行
 -->
 <template>
   <div class="filter-bar-wrap">
@@ -70,7 +70,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <!-- 条件变更不自动查询，点击搜索才取数 -->
+        <!-- 条件变更由父组件防抖后自动查询，点击搜索立即执行 -->
         <el-button class="filter-search" type="primary" :icon="Search" :loading="searching" @click="emitSearch">
           搜索
         </el-button>
@@ -318,7 +318,7 @@ function emitSearch() {
 }
 
 /**
- * 手动选择日期范围后清掉快捷范围标签，条件本身等待点击搜索后生效
+ * 手动选择日期范围后清掉快捷范围标签，条件变更会触发防抖搜索
  */
 function onDateRangeChange() {
   activeQuickLabel.value = '快捷范围'
@@ -431,7 +431,7 @@ function resetFilters() {
 }
 
 /**
- * 按快捷范围设置日期条件，设置后等待点击搜索才取数
+ * 按快捷范围设置日期条件，设置后由防抖搜索自动取数
  * @param {string} type 快捷范围类型
  */
 async function quickRange(type: string) {

@@ -47,6 +47,7 @@ import { useModal } from '@/composables/useModal'
 import { mergeTasksIntoHistory } from '@/services/historyPersistence'
 import { workPackageUrl } from '@/utils/tag'
 import { ipc } from '@/utils/ipc'
+import { getErrorMessage } from '@/utils/error'
 import type { NotificationElement } from '@/types/api'
 import type { HistoryTaskItem } from '@/types/ipc'
 import UnreadNotifications from '@/views/Workbench/components/UnreadNotifications.vue'
@@ -84,7 +85,7 @@ function handleRefresh() {
   }
 }
 
-const saveModal = useModal({
+const saveModal = useModal<{ taskCount: number; defaultDate: string }, { confirm: (date: string) => void }>({
   component: () => import('@/views/TaskExtract/modals/SaveHistoryModal.vue'),
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
@@ -164,8 +165,8 @@ async function saveNotificationsToHistory(rows: NotificationElement[], date: str
     }
     const added = await mergeTasksIntoHistory(date, tasks)
     logStore.addLog('success', `已加入历史任务: 新增 ${added} 条`)
-  } catch (e: any) {
-    logStore.addLog('error', `加入历史任务失败: ${e.message}`)
+  } catch (e) {
+    logStore.addLog('error', `加入历史任务失败: ${getErrorMessage(e)}`)
   }
 }
 

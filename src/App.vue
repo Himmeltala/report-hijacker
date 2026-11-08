@@ -151,7 +151,7 @@ async function handleProfileSwitched(_name: string) {
   await store.loadConfig()
   // 应用新档案的主题设置
   try {
-    const savedTheme = await window.electron.getSetting('appearance.theme')
+    const savedTheme = await window.electron.getSetting<string>('appearance.theme')
     theme.value = savedTheme || 'dark'
   } catch {
     theme.value = 'dark'
@@ -205,7 +205,7 @@ onMounted(async () => {
   await loadProfiles()
 
   try {
-    const savedTheme = await window.electron.getSetting('appearance.theme')
+    const savedTheme = await window.electron.getSetting<string>('appearance.theme')
     theme.value = savedTheme || 'dark'
   } catch {
     theme.value = 'dark'

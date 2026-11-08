@@ -2,74 +2,76 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-13 00:26:38
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 23:15:00
+ * @LastEditTime: 2026-11-08 17:30:00
  * @FilePath: \electron\preload.ts
  * @Description: 预加载脚本，通过 contextBridge 暴露 IPC 接口
  */
 import { contextBridge, ipcRenderer } from 'electron'
+import type { IpcRendererEvent } from 'electron'
+import type { IpcApi } from '@/types/ipc'
 
 // 注册 IPC 事件监听，返回取消订阅函数
-function subscribe(channel: string, callback: (...args: any[]) => void): () => void {
-  const handler = (_e: any, ...args: any[]) => callback(...args)
+function subscribe<T extends unknown[]>(channel: string, callback: (...args: T) => void): () => void {
+  const handler = (_e: IpcRendererEvent, ...args: unknown[]) => callback(...(args as T))
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.removeListener(channel, handler)
 }
 
-contextBridge.exposeInMainWorld('electron', {
+// 实现受 IpcApi 约束：主进程新增接口时，这里漏实现会在编译期报错
+const api: IpcApi = {
   // #region 设置读写
   getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
   getSettingsAll: () => ipcRenderer.invoke('settings:getAll'),
-  setSetting: (key: string, value: any) => ipcRenderer.invoke('settings:set', key, value),
+  setSetting: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
   getSettingsSchema: () => ipcRenderer.invoke('settings:getSchema'),
   exportSettings: () => ipcRenderer.invoke('settings:export'),
   importSettings: () => ipcRenderer.invoke('settings:import'),
   // #endregion
 
   // #region 任务详情
-  fetchTaskDetail: (params: any) => ipcRenderer.invoke('api:fetchTaskDetail', params),
-  checkComments: (params: any) => ipcRenderer.invoke('api:checkComments', params),
-  aiChat: (params: any) => ipcRenderer.invoke('ai:chat', params),
+  fetchTaskDetail: (params) => ipcRenderer.invoke('api:fetchTaskDetail', params),
+  checkComments: (params) => ipcRenderer.invoke('api:checkComments', params),
+  aiChat: (params) => ipcRenderer.invoke('ai:chat', params),
   // #endregion
 
   // #region 通知
-  fetchNotifications: (params: any) => ipcRenderer.invoke('api:fetchNotifications', params),
-  markNotificationRead: (params: any) => ipcRenderer.invoke('api:markNotificationRead', params),
-  markNotificationsRead: (params: any) => ipcRenderer.invoke('api:markNotificationsRead', params),
+  fetchNotifications: (params) => ipcRenderer.invoke('api:fetchNotifications', params),
+  markNotificationRead: (params) => ipcRenderer.invoke('api:markNotificationRead', params),
+  markNotificationsRead: (params) => ipcRenderer.invoke('api:markNotificationsRead', params),
   // #endregion
 
   // #region 系统通知
-  showSysNotification: (params: any) => ipcRenderer.invoke('sys:showNotification', params),
+  showSysNotification: (params) => ipcRenderer.invoke('sys:showNotification', params),
   // #endregion
 
   // #region 通用数据存储
   storeGet: (key: string) => ipcRenderer.invoke('store:get', key),
-  storeSet: (key: string, value: any) => ipcRenderer.invoke('store:set', key, value),
+  storeSet: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value),
   storeDelete: (key: string) => ipcRenderer.invoke('store:delete', key),
   storeKeys: () => ipcRenderer.invoke('store:keys'),
   // #endregion
 
   // #region 文件对话框
-  openFile: (params: any) => ipcRenderer.invoke('dialog:openFile', params),
-  saveFile: (params: any) => ipcRenderer.invoke('dialog:saveFile', params),
+  openFile: (params) => ipcRenderer.invoke('dialog:openFile', params),
+  saveFile: (params) => ipcRenderer.invoke('dialog:saveFile', params),
   // #endregion
 
   // #region 文件读写
-  writeTextFile: (params: any) => ipcRenderer.invoke('file:writeTextFile', params),
-  writeBinaryFile: (params: any) => ipcRenderer.invoke('file:writeBinaryFile', params),
-  copyImagePng: (params: any) => ipcRenderer.invoke('clipboard:writeImagePng', params),
-  copyText: (params: any) => ipcRenderer.invoke('clipboard:writeText', params),
-  fillExcelTemplate: (params: any) => ipcRenderer.invoke('file:fillExcelTemplate', params),
+  writeTextFile: (params) => ipcRenderer.invoke('file:writeTextFile', params),
+  writeBinaryFile: (params) => ipcRenderer.invoke('file:writeBinaryFile', params),
+  copyImagePng: (params) => ipcRenderer.invoke('clipboard:writeImagePng', params),
+  copyText: (params) => ipcRenderer.invoke('clipboard:writeText', params),
+  fillExcelTemplate: (params) => ipcRenderer.invoke('file:fillExcelTemplate', params),
   // #endregion
 
   // #region 历史任务
-  listHistoryDates: (range?: { startDate?: string; endDate?: string }) =>
-    ipcRenderer.invoke('history:listDates', range),
+  listHistoryDates: (range) => ipcRenderer.invoke('history:listDates', range),
   getHistoryDate: (date: string) => ipcRenderer.invoke('history:getDate', date),
-  saveHistoryDate: (date: string, data: any) => ipcRenderer.invoke('history:saveDate', date, data),
-  batchSaveHistory: (batch: Array<{ date: string; data: any }>) => ipcRenderer.invoke('history:batchSave', batch),
+  saveHistoryDate: (date: string, data) => ipcRenderer.invoke('history:saveDate', date, data),
+  batchSaveHistory: (batch) => ipcRenderer.invoke('history:batchSave', batch),
   deleteHistoryDate: (date: string) => ipcRenderer.invoke('history:deleteDate', date),
-  queryHistory: (params: any) => ipcRenderer.invoke('history:query', params),
-  syncHistoryTasks: (tasks: any[], cookie: string) => ipcRenderer.invoke('history:syncTasks', tasks, cookie),
+  queryHistory: (params) => ipcRenderer.invoke('history:query', params),
+  syncHistoryTasks: (tasks, cookie: string) => ipcRenderer.invoke('history:syncTasks', tasks, cookie),
   restoreHistoryFromDir: () => ipcRenderer.invoke('history:restoreFromDir'),
   backupNow: (dirs?: string[]) => ipcRenderer.invoke('history:backupNow', dirs),
   // #endregion
@@ -87,15 +89,17 @@ contextBridge.exposeInMainWorld('electron', {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   getUpdateStatus: () => ipcRenderer.invoke('update:status'),
   applyUpdate: () => ipcRenderer.invoke('update:apply'),
-  onUpdateAvailable: (callback: (data: any) => void) => subscribe('event:updateAvailable', callback),
-  onUpdateProgress: (callback: (data: any) => void) => subscribe('event:updateProgress', callback),
+  onUpdateAvailable: (callback) => subscribe('event:updateAvailable', callback),
+  onUpdateProgress: (callback) => subscribe('event:updateProgress', callback),
   // #endregion
 
   // #region 事件监听
   onThemeChanged: (callback: (theme: string) => void) => subscribe('event:themeChanged', callback),
-  onMenuEvent: (callback: (data: { action: string }) => void) => subscribe('menu:event', callback),
+  onMenuEvent: (callback) => subscribe('menu:event', callback),
   onProfileSwitched: (callback: (name: string) => void) => subscribe('profile:switched', callback),
   onAutoSyncSettingsChanged: (callback: () => void) => subscribe('event:autoSyncSettingsChanged', callback),
   onBackupCompleted: (callback: () => void) => subscribe('event:backupCompleted', callback),
   // #endregion
-})
+}
+
+contextBridge.exposeInMainWorld('electron', api)

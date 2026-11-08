@@ -33,22 +33,19 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-
-interface TimeLimitForm {
-  timeLimit: 'today' | 'temp' | null
-}
+import type { TaskTimeLimit, TaskTimeLimitForm } from '@/types/history'
 
 // 弹窗内用 none 表示未设置，确认时再转回 null，便于绑定 radio
-type TimeLimitOption = 'today' | 'temp' | 'none'
+type TimeLimitOption = TaskTimeLimit | 'none'
 
 const props = defineProps<{
   visible: boolean
-  form: TimeLimitForm | null
+  form: TaskTimeLimitForm | null
 }>()
 
 const emit = defineEmits<{
   close: []
-  confirm: [form: TimeLimitForm]
+  confirm: [form: TaskTimeLimitForm]
   'update:visible': [value: boolean]
 }>()
 

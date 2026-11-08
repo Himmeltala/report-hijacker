@@ -7,6 +7,20 @@
  * @Description: 颜色处理工具函数
  */
 
+// #region 类型定义
+
+/** ECharts 线性渐变色对象，type 收窄为字面量以匹配图表配置项类型 */
+export interface AreaGradient {
+  type: 'linear'
+  x: number
+  y: number
+  x2: number
+  y2: number
+  colorStops: Array<{ offset: number; color: string }>
+}
+
+// #endregion
+
 // #region 颜色转换
 
 /**
@@ -32,12 +46,22 @@ export function hexToRgba(hex: string, alpha: number): string {
 }
 
 /**
+ * 按档位生成基准颜色的深浅变体：档位为 0 时取基准强度，正档逐档增强、负档逐档减弱
+ * @param {string} baseColor 基准十六进制颜色
+ * @param {number} level 档位偏移，正数增强、负数减弱
+ */
+export function getLevelColor(baseColor: string, level: number): string {
+  const alpha = Math.min(1, Math.max(0.2, 0.5 + level * 0.1))
+  return hexToRgba(baseColor, Number(alpha.toFixed(2)))
+}
+
+/**
  * 生成从指定颜色到透明的垂直渐变色对象，用于 ECharts 面积图
  * @param {string} color 十六进制颜色值
  * @param {number} topAlpha 顶部透明度，默认 0.6
  * @param {number} bottomAlpha 底部透明度，默认 0.05
  */
-export function createAreaGradient(color: string, topAlpha = 0.6, bottomAlpha = 0.05) {
+export function createAreaGradient(color: string, topAlpha = 0.6, bottomAlpha = 0.05): AreaGradient {
   return {
     type: 'linear',
     x: 0,

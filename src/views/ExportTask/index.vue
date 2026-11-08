@@ -79,9 +79,10 @@ import { useTaskStore } from '@/stores/task.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
 import { parseTaskText } from '@/utils/parser'
-import { reviewBatch, type TaskToValidate } from '@/services/taskValidation'
+import { getErrorMessage } from '@/utils/error'
+import { reviewBatch, toTaskToValidate, type TaskToValidate } from '@/services/taskValidation'
 import { computeTaskStats } from '@/services/taskStats'
-import type { TaskItem } from '@/types/task'
+import type { TaskDetailResult, TaskItem } from '@/types/task'
 
 import ParseInput from '@/components/ParseInput.vue'
 import TaskTable from '@/views/ExportTask/components/TaskTable.vue'
@@ -90,7 +91,7 @@ const store = useSettingsStore()
 const taskStore = useTaskStore()
 const logStore = useLogStore()
 
-const detailModal = useModal({
+const detailModal = useModal<{ result: TaskDetailResult | null; aiConclusion?: string | null }>({
   component: () => import('@/modals/TaskDetailModal.vue'),
   autoCloseEvents: ['close'],
 })
@@ -154,15 +155,7 @@ async function handleFetchData() {
   taskStore.setDetailResults([])
   logStore.addLog('info', `开始获取平台数据 ${tasks.value.length} 条任务...`)
 
-  const ttv: TaskToValidate[] = tasks.value.map((t) => ({
-    rawSeq: t.rawSeq,
-    rawProjectName: t.rawProjectName,
-    rawTitle: t.rawTitle,
-    rawScore: t.rawScore,
-    rawEstimatedHours: t.rawEstimatedHours,
-    rawRemark: t.rawRemark,
-    rawUrl: t.rawUrl,
-  }))
+  const ttv: TaskToValidate[] = tasks.value.map(toTaskToValidate)
 
   try {
     // 按原索引写入结果与日志
@@ -231,8 +224,8 @@ async function handleExport() {
     } else {
       logStore.addLog('error', `导出失败: ${result.error}`)
     }
-  } catch (e: any) {
-    logStore.addLog('error', `导出异常: ${e.message}`)
+  } catch (e) {
+    logStore.addLog('error', `导出异常: ${getErrorMessage(e)}`)
   } finally {
     isExporting.value = false
   }
@@ -248,20 +241,7 @@ async function fetchSingleDetail(index: number) {
   const { cookie, handlerName } = store.config
   if (!cookie) return
 
-  const outcomes = await reviewBatch(
-    [
-      {
-        rawSeq: task.rawSeq,
-        rawProjectName: task.rawProjectName,
-        rawTitle: task.rawTitle,
-        rawScore: task.rawScore,
-        rawEstimatedHours: task.rawEstimatedHours,
-        rawRemark: task.rawRemark,
-        rawUrl: task.rawUrl,
-      },
-    ],
-    { cookie, handlerName },
-  )
+  const outcomes = await reviewBatch([toTaskToValidate(task)], { cookie, handlerName })
   const o = outcomes[0]
   if (!o) return
   taskStore.detailResults[index] = o.error ? null : o.result

@@ -91,6 +91,7 @@
 import { ref, computed } from 'vue'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
+import { getErrorMessage } from '@/utils/error'
 import type { NotificationElement } from '@/types/api'
 import { statusTagType, workPackageUrl, formatTime, PAGE_SIZE_LIST } from '@/utils/tag'
 import { compareTaskOrder, type TaskOrderFields } from '@/services/taskOrder'
@@ -172,8 +173,8 @@ async function loadData() {
       'success',
       `获取全部通知: 第${currentPage.value}页 ${elements.length} 条，共 ${totalCount.value} 条`,
     )
-  } catch (e: any) {
-    logStore.addLog('error', `获取通知失败: ${e.message}`)
+  } catch (e) {
+    logStore.addLog('error', `获取通知失败: ${getErrorMessage(e)}`)
   } finally {
     loading.value = false
   }

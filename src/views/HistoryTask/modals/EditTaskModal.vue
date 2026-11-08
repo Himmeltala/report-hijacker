@@ -51,24 +51,20 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { HistoryTaskItem } from '@/types/ipc'
-
-interface EditableTask extends HistoryTaskItem {
-  serDate: string
-}
+import type { DatedTask } from '@/types/history'
 
 const props = defineProps<{
   visible: boolean
-  task: EditableTask | null
+  task: DatedTask | null
 }>()
 
 const emit = defineEmits<{
   close: []
-  confirm: [task: EditableTask]
+  confirm: [task: DatedTask]
   'update:visible': [value: boolean]
 }>()
 
-const form = ref<EditableTask | null>(null)
+const form = ref<DatedTask | null>(null)
 const formRef = ref()
 
 watch(

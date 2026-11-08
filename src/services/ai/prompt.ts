@@ -1,13 +1,8 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-03 22:25:54
- * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-06 12:04:00
- * @FilePath: \src\utils\ai.ts
- * @Description: AI 模块层工具：提示词占位符替换、富文本转纯文本（保留图片占位）与通用 AI 通道入口
+ * @Date: 2026-11-08
+ * @Description: AI 提示词纯函数：占位符替换、富文本转纯文本
  */
-
-import type { AiChatParams, AiChatResult } from '@/types/ipc'
 
 // #region 常量
 
@@ -63,28 +58,23 @@ export function toPlainText(raw: string): string {
     .trim()
 }
 
-// #endregion
 
-// #region 通用通道
-
-/**
- * 调用统一 AI 通道
- * @param {AiChatParams} params 单轮提示词或完整消息列表，可附带工具定义
- * @returns {Promise<AiChatResult & { reasoning: string }>} 模型输出文本、思考过程与本轮工具调用，思考过程统一转为字符串
- */
-export async function aiChat(params: AiChatParams): Promise<AiChatResult & { reasoning: string }> {
-  const ret = await window.electron.aiChat(params)
-  return { text: ret.text, reasoning: ret.reasoning ?? '', toolCalls: ret.toolCalls }
-}
+// #region 模型输出清洗
 
 /**
- * 读取某模块的 AI 配置项（提示词等按模块独立配置，键名带模块前缀）
- * @param {string} key 完整设置键，如 ai.taskReview.prompt
- * @returns {Promise<string>} 设置值，未配置返回空字符串
+ * 去掉模型返回的代码围栏，只保留源码
+ * @param {string} text 模型输出
+ * @returns {string} 去掉围栏后的文本
  */
-export async function getAiSetting(key: string): Promise<string> {
-  const val = await window.electron.getSetting(key)
-  return val === undefined || val === null ? '' : String(val)
+export function stripCodeFence(text: string): string {
+  const trimmed = text.trim()
+  const matched = trimmed.match(/```[a-zA-Z]*\s*\n([\s\S]*?)```/)
+  if (matched) return matched[1].trim()
+  // 围栏没闭合时去掉开头那一行和末尾残留的反引号
+  return trimmed
+    .replace(/^```[a-zA-Z]*\s*\n?/, '')
+    .replace(/```\s*$/, '')
+    .trim()
 }
 
 // #endregion

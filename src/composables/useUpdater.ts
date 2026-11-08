@@ -10,6 +10,7 @@
 import { ref, onScopeDispose } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useLogStore } from '@/stores/log.store'
+import { getErrorMessage } from '@/utils/error'
 import type { UpdateCheckResult, UpdateProgress, UpdateStatus } from '@/types/update'
 
 // 转义 HTML：版本号来自接口或文件名，弹窗按 HTML 渲染前先转义
@@ -32,8 +33,8 @@ export function useUpdater() {
   async function loadStatus(): Promise<void> {
     try {
       status.value = await window.electron.getUpdateStatus()
-    } catch (e: any) {
-      logStore.addLog('error', `读取更新状态失败: ${e?.message || e}`)
+    } catch (e) {
+      logStore.addLog('error', `读取更新状态失败: ${getErrorMessage(e, String(e))}`)
     }
   }
 
@@ -57,8 +58,8 @@ export function useUpdater() {
         )
       }
       return result
-    } catch (e: any) {
-      logStore.addLog('error', `检查更新失败: ${e?.message || e}`)
+    } catch (e) {
+      logStore.addLog('error', `检查更新失败: ${getErrorMessage(e, String(e))}`)
       return null
     } finally {
       checking.value = false
@@ -95,8 +96,8 @@ export function useUpdater() {
       }
       logStore.addLog('error', `更新失败: ${ret.error || '未知错误'}`)
       return false
-    } catch (e: any) {
-      logStore.addLog('error', `更新失败: ${e?.message || e}`)
+    } catch (e) {
+      logStore.addLog('error', `更新失败: ${getErrorMessage(e, String(e))}`)
       return false
     } finally {
       applying.value = false

@@ -2,52 +2,126 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 23:15:00
+ * @LastEditTime: 2026-11-08 17:20:00
  * @FilePath: \..\\src\\types\\ipc.ts
- * @Description: 描述
+ * @Description: IPC 接口契约，渲染层与主进程共用的参数、结果类型
  */
 
-import type { TaskDetailResult } from '@/types/task'
+import type { AiChatParams, AiChatResult } from '@/types/ai'
+import type { HistoryDay } from '@/types/history'
+import type { ExcelTaskRow, RawTaskFields, TaskDetailResult } from '@/types/task'
 import type { ActivitiesResponse, NotificationsResponse } from '@/types/api'
 import type { ReadonlyRawWorkPackage } from '@/types/remote'
+import type { SettingsSchema } from '@/types/settings'
 import type { UpdateApplyResult, UpdateCheckResult, UpdateProgress, UpdateStatus } from '@/types/update'
 
-export interface HistoryTaskItem {
-  serId: string
-  serDate: string
-  rawSeq: number
-  rawProjectName: string
-  rawTitle: string
-  rawHandler: string
-  rawUrl: string
-  rawScore: string
-  rawEstimatedHours: string
-  rawRemark: string
-  rawText: string
-  serSyncStatus: 'none' | 'synced'
-  serWorkPackageId: string | null
-  // 远程原始数据，只读，平台字段原封不动
-  remote: ReadonlyRawWorkPackage | null
-  serSyncedAt: string | null
-  // AI 审查结论，未执行 AI 审查时为 null
-  serAiConclusion?: string | null
-  // 任务优先级：高、中、低
-  serPriority: 'high' | 'medium' | 'low' | null
-  // 限时任务：今日、临时
-  serTimeLimit: 'today' | 'temp' | null
-  // 是否为延期任务（本地标记）
-  serPostponed: boolean
-  serPostponedReason: string
-  serCreatedAt: string
-  serUpdatedAt: string
+// AI 对话类型按领域拆分到 ai.ts，这里保留 re-export 兼容既有导入
+export type { AiChatMessage, AiChatParams, AiChatResult, AiChatTool, AiChatToolCall } from '@/types/ai'
+// 历史任务模型按领域拆分到 history.ts，这里保留 re-export 兼容既有导入
+export type {
+  DatedTask,
+  HistoryDay,
+  HistoryTaskItem,
+  TaskPriority,
+  TaskSyncStatus,
+  TaskTimeLimit,
+} from '@/types/history'
+
+// #region 通用参数与结果
+
+/** 设置项键值对集合，键名为点号分隔的完整键名 */
+export type FlatSettings = Record<string, unknown>
+
+/** 历史查询的日期区间，省略表示不限 */
+export interface HistoryDateRange {
+  startDate?: string
+  endDate?: string
 }
 
-export interface HistoryDay {
-  date: string
-  tasks: HistoryTaskItem[]
-  createdAt: string
-  updatedAt: string
+/** 历史查询参数，keyword 为空表示不按关键字过滤 */
+export interface QueryHistoryParams extends HistoryDateRange {
+  keyword?: string
 }
+
+/** 文件对话框的类型过滤器 */
+export interface FileFilter {
+  name: string
+  extensions: string[]
+}
+
+/** 文件对话框的可选行为 */
+export type FileDialogProperty = 'openFile' | 'openDirectory' | 'multiSelections'
+
+/** 通知写操作结果，data 为平台返回的原始响应 */
+export interface NotificationMutationResult {
+  success: boolean
+  data?: unknown
+}
+
+/** 系统通知参数 */
+export interface SysNotificationParams {
+  title: string
+  body: string
+  silent?: boolean
+  timeoutType?: 'default' | 'never'
+}
+
+/** 系统通知结果，reason 说明未展示的原因 */
+export interface SysNotificationResult {
+  success: boolean
+  reason?: string
+}
+
+/** 主进程菜单事件 */
+export interface MenuEventPayload {
+  action: string
+}
+
+/** 设置导出结果 */
+export interface SettingsExportResult {
+  success: boolean
+  filePath?: string
+}
+
+/** 设置导入结果 */
+export interface SettingsImportResult {
+  success: boolean
+}
+
+/** 历史同步入参，需提供工作包 ID 或可解析出 ID 的任务链接 */
+export type SyncableTask = Pick<RawTaskFields, 'rawUrl'> & {
+  serId?: string
+  serWorkPackageId?: string | null
+}
+
+/** 单条历史同步结果 */
+export interface SyncHistoryTaskResult {
+  taskId: string
+  workPackageId: string | null
+  exists: boolean
+  // 远程原始数据（只读）
+  remote: ReadonlyRawWorkPackage | null
+  error?: string
+}
+
+/** 从备份目录恢复历史的结果 */
+export interface RestoreHistoryResult {
+  // 成功恢复的历史文件数
+  count: number
+}
+
+/** 立即备份的结果 */
+export interface BackupResult {
+  success: boolean
+  message?: string
+  count?: number
+  total?: number
+  time?: string
+}
+
+// #endregion
+
+// #region 各接口入参
 
 export interface FetchTaskDetailParams {
   rawUrl: string
@@ -59,64 +133,18 @@ export interface CheckCommentsParams {
   cookie: string
 }
 
-// 对话消息，支持多轮与工具调用回填（OpenAI 兼容格式）
-export interface AiChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content?: string | null
-  // 模型要求调用的工具
-  tool_calls?: AiChatToolCall[]
-  // 工具结果对应的调用 id
-  tool_call_id?: string
-}
-
-export interface AiChatToolCall {
-  id: string
-  type: 'function'
-  function: {
-    name: string
-    // 参数为 JSON 字符串，由调用方解析
-    arguments: string
-  }
-}
-
-export interface AiChatTool {
-  type: 'function'
-  function: {
-    name: string
-    description?: string
-    // JSON Schema 格式的参数定义
-    parameters?: Record<string, unknown>
-  }
-}
-
-export interface AiChatParams {
-  // 单轮调用的最终提示词，与 messages 二选一
-  prompt?: string
-  // 多轮调用的完整消息列表，优先于 prompt
-  messages?: AiChatMessage[]
-  // 可用工具定义，不传时按纯文本对话
-  tools?: AiChatTool[]
-}
-
-export interface AiChatResult {
-  text: string
-  reasoning?: string
-  // 模型本轮要求调用的工具，为空表示对话结束
-  toolCalls?: AiChatToolCall[]
-}
-
 export interface OpenFileParams {
-  filters?: { name: string; extensions: string[] }[]
-  properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+  filters?: FileFilter[]
+  properties?: FileDialogProperty[]
 }
 
 export interface SaveFileParams {
   defaultName: string
-  filters?: { name: string; extensions: string[] }[]
+  filters?: FileFilter[]
 }
 
 export interface FillExcelTemplateParams {
-  tasks: any[]
+  tasks: ExcelTaskRow[]
   templatePath?: string
   targetPath: string
   handlerName: string
@@ -164,15 +192,19 @@ export interface FillExcelTemplateResult {
   error?: string
 }
 
+// #endregion
+
+// #region IPC 接口
+
 export interface IpcApi {
-  getSetting: (key: string) => Promise<any>
-  getSettingsAll: () => Promise<Record<string, any>>
-  setSetting: (key: string, value: any) => Promise<void>
-  getSettingsSchema: () => Promise<any[]>
-  exportSettings: () => Promise<{ success: boolean; filePath?: string }>
-  importSettings: () => Promise<{ success: boolean } | null>
+  getSetting: <T = unknown>(key: string) => Promise<T>
+  getSettingsAll: () => Promise<FlatSettings>
+  setSetting: (key: string, value: unknown) => Promise<void>
+  getSettingsSchema: () => Promise<SettingsSchema>
+  exportSettings: () => Promise<SettingsExportResult>
+  importSettings: () => Promise<SettingsImportResult | null>
   onThemeChanged: (callback: (theme: string) => void) => () => void
-  onMenuEvent: (callback: (data: { action: string }) => void) => () => void
+  onMenuEvent: (callback: (data: MenuEventPayload) => void) => () => void
 
   storeGet: (key: string) => Promise<any>
   storeSet: (key: string, value: any) => Promise<void>
@@ -188,15 +220,10 @@ export interface IpcApi {
 
   fetchNotifications: (params: FetchNotificationsParams) => Promise<NotificationsResponse>
   // 主进程返回 { success, data } 结构
-  markNotificationRead: (params: MarkNotificationReadParams) => Promise<{ success: boolean; data?: any }>
-  markNotificationsRead: (params: MarkNotificationsReadParams) => Promise<{ success: boolean; data?: any }>
+  markNotificationRead: (params: MarkNotificationReadParams) => Promise<NotificationMutationResult>
+  markNotificationsRead: (params: MarkNotificationsReadParams) => Promise<NotificationMutationResult>
 
-  showSysNotification: (params: {
-    title: string
-    body: string
-    silent?: boolean
-    timeoutType?: 'default' | 'never'
-  }) => Promise<{ success: boolean; reason?: string }>
+  showSysNotification: (params: SysNotificationParams) => Promise<SysNotificationResult>
 
   openFile: (params: OpenFileParams) => Promise<string | null>
   saveFile: (params: SaveFileParams) => Promise<string | null>
@@ -207,33 +234,16 @@ export interface IpcApi {
   copyText: (params: CopyTextParams) => Promise<void>
   fillExcelTemplate: (params: FillExcelTemplateParams) => Promise<FillExcelTemplateResult>
 
-  listHistoryDates: (range?: { startDate?: string; endDate?: string }) => Promise<string[]>
+  listHistoryDates: (range?: HistoryDateRange) => Promise<string[]>
   getHistoryDate: (date: string) => Promise<HistoryDay | null>
-  saveHistoryDate: (date: string, data: any) => Promise<void>
+  saveHistoryDate: (date: string, data: HistoryDay) => Promise<void>
   batchSaveHistory: (batch: Array<{ date: string; data: HistoryDay }>) => Promise<void>
   deleteHistoryDate: (date: string) => Promise<void>
-  queryHistory: (params: { startDate?: string; endDate?: string; keyword?: string }) => Promise<HistoryDay[]>
-  syncHistoryTasks: (
-    tasks: any[],
-    cookie: string,
-  ) => Promise<
-    Array<{
-      taskId: string
-      workPackageId: string | null
-      exists: boolean
-      // 远程原始数据（只读）
-      remote: ReadonlyRawWorkPackage | null
-      error?: string
-    }>
-  >
+  queryHistory: (params: QueryHistoryParams) => Promise<HistoryDay[]>
+  syncHistoryTasks: (tasks: SyncableTask[], cookie: string) => Promise<SyncHistoryTaskResult[]>
 
-  restoreHistoryFromDir: () => Promise<{
-    // 成功恢复的历史文件数
-    count: number
-  }>
-  backupNow: (
-    dirs?: string[],
-  ) => Promise<{ success: boolean; message?: string; count?: number; total?: number; time?: string }>
+  restoreHistoryFromDir: () => Promise<RestoreHistoryResult>
+  backupNow: (dirs?: string[]) => Promise<BackupResult>
 
   profileCurrent: () => Promise<string>
   profileList: () => Promise<string[]>
@@ -252,6 +262,8 @@ export interface IpcApi {
   onAutoSyncSettingsChanged: (callback: () => void) => () => void
   onBackupCompleted: (callback: () => void) => () => void
 }
+
+// #endregion
 
 declare global {
   // eslint-disable-next-line no-unused-vars

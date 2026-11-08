@@ -38,11 +38,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-
-interface PostponeForm {
-  postponed: boolean
-  postponedReason: string
-}
+import type { PostponeForm } from '@/types/history'
 
 const props = defineProps<{
   visible: boolean

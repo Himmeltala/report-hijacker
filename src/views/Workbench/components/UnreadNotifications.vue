@@ -100,6 +100,7 @@ import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import type { NotificationElement } from '@/types/api'
 import { getCache, setCache, removeCache } from '@/utils/cache'
+import { getErrorMessage } from '@/utils/error'
 import { statusTagType, workPackageUrl, formatTime, PAGE_SIZE_LIST } from '@/utils/tag'
 import { compareTaskOrder, type TaskOrderFields } from '@/services/taskOrder'
 
@@ -250,8 +251,8 @@ async function loadData(forceRefresh = false) {
     clearSelection()
     setCache(cacheKey, { visible: deduped, wpIds: wpIdMap }, CACHE_TTL)
     logStore.addLog('success', `获取未读通知: ${all.length} 条，去重后 ${deduped.length} 条`)
-  } catch (e: any) {
-    logStore.addLog('error', `获取通知失败: ${e.message}`)
+  } catch (e) {
+    logStore.addLog('error', `获取通知失败: ${getErrorMessage(e)}`)
   } finally {
     loading.value = false
   }
@@ -282,9 +283,9 @@ async function markAsRead(row: NotificationElement) {
       'success',
       wpId != null ? `已标记工作包 #${wpId} 的 ${ids.length} 条通知为已读` : `已标记通知 #${row.id} 为已读`,
     )
-  } catch (e: any) {
+  } catch (e) {
     // 失败时条目保留在列表里，不假装已读
-    logStore.addLog('error', `标记已读失败: ${e.message}`)
+    logStore.addLog('error', `标记已读失败: ${getErrorMessage(e)}`)
   } finally {
     readingId.value = null
     mutating = false

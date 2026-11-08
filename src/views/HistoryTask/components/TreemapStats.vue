@@ -8,35 +8,17 @@
 -->
 <template>
   <div class="treemap-stats">
-    <el-skeleton v-if="loading" animated class="treemap-skeleton">
-      <template #template>
-        <el-skeleton-item variant="rect" style="width: 100%; height: 100%; border-radius: 8px" />
-      </template>
-    </el-skeleton>
-    <el-empty v-else-if="!treemapData.length" description="该时段暂无任务" />
+    <el-empty v-if="!treemapData.length" description="该时段暂无任务" />
     <div v-else ref="treemapRef" class="treemap-stats-body"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
 import { getGlassTooltipStyle, tooltipRow } from '@/utils/color'
-import { useLogStore } from '@/stores/log.store'
-import { ipc } from '@/utils/ipc'
-
-const logStore = useLogStore()
-
-interface ProjectItem {
-  name: string
-  value: number
-}
-
-interface StatsRange {
-  start: string
-  end: string
-  calendar: number | string
-}
+import type { HistoryDay } from '@/types/ipc'
+import type { ProjectShareItem, StatsRange } from '@/types/chart'
 
 // 项目占比图配色，覆盖不同数量的项目块以保证区分度
 const TREEMAP_COLORS = [
@@ -53,45 +35,26 @@ const TREEMAP_COLORS = [
   '#2db7f5',
 ]
 
-const props = defineProps<{ range: StatsRange }>()
-const loading = ref(false)
-const treemapData = ref<ProjectItem[]>([])
+const props = defineProps<{ range: StatsRange; days: HistoryDay[] }>()
 const treemapRef = ref<HTMLDivElement | null>(null)
 
-/**
- * 拉取选中时段的历史数据并聚合各文本项目的任务数量
- */
-async function loadTreemap() {
-  loading.value = true
-  try {
-    const days = await ipc.queryHistory({
-      startDate: props.range.start,
-      endDate: props.range.end,
-    })
-    const countMap = new Map<string, number>()
-    for (const day of days) {
-      for (const t of day.tasks) {
-        const key = t.rawProjectName || '未命名项目'
-        countMap.set(key, (countMap.get(key) || 0) + 1)
-      }
+// 由父组件统一下发历史数据，这里聚合各文本项目的任务数量
+const treemapData = computed<ProjectShareItem[]>(() => {
+  const countMap = new Map<string, number>()
+  for (const day of props.days || []) {
+    for (const t of day.tasks) {
+      const key = t.rawProjectName || '未命名项目'
+      countMap.set(key, (countMap.get(key) || 0) + 1)
     }
-    const sorted = Array.from(countMap, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
-    treemapData.value = sorted
-  } catch (e: any) {
-    logStore.addLog('error', '矩形树图数据加载失败: ' + (e?.message || e))
-    treemapData.value = []
-  } finally {
-    loading.value = false
   }
-}
-
-watch(() => props.range, loadTreemap, { immediate: true })
+  return Array.from(countMap, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+})
 
 useChartRoll({
   chartRef: treemapRef,
   dataSource: treemapData,
   xAxis: () => [],
-  generateOption: (data: any) => {
+  generateOption: (data: ProjectShareItem[]) => {
     if (!data || !data.length) return {}
     const colors = getThemeTextColors()
     const surface =
@@ -149,10 +112,6 @@ useChartRoll({
 .treemap-stats {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-.treemap-skeleton {
   flex: 1;
   min-height: 0;
 }

@@ -8,6 +8,7 @@
  */
 
 import { useLogStore } from '@/stores/log.store'
+import { getErrorMessage } from '@/utils/error'
 
 // #region 系统通知
 
@@ -20,17 +21,18 @@ import { useLogStore } from '@/stores/log.store'
 export async function maybeShowSysNotification(sceneKey: string, title: string, body: string): Promise<void> {
   const logStore = useLogStore()
   try {
-    const enabled = await window.electron.getSetting('notification.enabled')
+    const enabled = await window.electron.getSetting<boolean>('notification.enabled')
     if (!enabled) return
-    if (!(await window.electron.getSetting(sceneKey))) return
-    if (await window.electron.getSetting('notification.onlyWhenBackground')) {
+    if (!(await window.electron.getSetting<boolean>(sceneKey))) return
+    if (await window.electron.getSetting<boolean>('notification.onlyWhenBackground')) {
       if (document.hasFocus()) return
     }
-    const silent = !!(await window.electron.getSetting('notification.silent'))
-    const timeoutType = (await window.electron.getSetting('notification.timeoutType')) === 'never' ? 'never' : 'default'
+    const silent = !!(await window.electron.getSetting<boolean>('notification.silent'))
+    const timeoutType =
+      (await window.electron.getSetting<string>('notification.timeoutType')) === 'never' ? 'never' : 'default'
     await window.electron.showSysNotification({ title, body, silent, timeoutType })
-  } catch (e: any) {
-    logStore.addLog('warning', '系统通知失败: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('warning', '系统通知失败: ' + getErrorMessage(e))
   }
 }
 

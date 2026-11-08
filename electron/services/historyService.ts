@@ -12,7 +12,7 @@ import type { BrowserWindow } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, copyFileSync, mkdirSync, readdirSync, rmSync, constants } from 'fs'
 import { readJsonFile, readJsonFileAsync, extractWpId, writeJsonAtomic } from '@electron/utils'
-import { readFile } from 'fs/promises'
+import { readFile, stat } from 'fs/promises'
 import { mapWithConcurrency } from '@electron/concurrency'
 import { writeStoreValue } from '@electron/services/storeService'
 import { pickOpenPath } from '@electron/services/fileService'
@@ -46,6 +46,47 @@ const SYNC_CONCURRENCY = 5
 // 历史查询扫描文件的并发上限
 const QUERY_CONCURRENCY = 8
 
+// 历史日文件解析缓存上限（按天计），命中时省去读盘与 JSON 解析
+const DAY_CACHE_LIMIT = 366
+
+interface DayCacheEntry {
+  mtimeMs: number
+  size: number
+  data: any
+}
+
+// 按文件绝对路径缓存已解析的历史日数据，mtime 与大小变化时视为失效
+const dayCache = new Map<string, DayCacheEntry>()
+
+/**
+ * 将缓存项移到队尾，维持最近最少使用顺序
+ * @param {string} filePath 历史日文件绝对路径
+ * @param {DayCacheEntry} entry 缓存项
+ */
+function touchDayCache(filePath: string, entry: DayCacheEntry): void {
+  dayCache.delete(filePath)
+  dayCache.set(filePath, entry)
+}
+
+/**
+ * 清理超出上限的最旧缓存项
+ */
+function trimDayCache(): void {
+  while (dayCache.size > DAY_CACHE_LIMIT) {
+    const oldestKey = dayCache.keys().next().value
+    if (oldestKey === undefined) break
+    dayCache.delete(oldestKey)
+  }
+}
+
+/**
+ * 移除指定历史日文件的缓存，写入或删除后调用
+ * @param {string} filePath 历史日文件绝对路径
+ */
+function invalidateDayCache(filePath: string): void {
+  dayCache.delete(filePath)
+}
+
 /**
  * @param {string[]} dirs 备份目标目录列表
  * @returns {number} 成功备份的目录数量
@@ -66,6 +107,39 @@ function performBackup(dirs: string[], getHistoryDir: () => string, getStoreDir:
     writeStoreValue(getStoreDir(), 'lastBackupTime', new Date().toISOString(), 0)
   }
   return ok
+}
+
+/**
+ * 读取单个历史日文件，命中缓存时跳过读盘与 JSON 解析
+ * @param {string} filePath 历史日文件绝对路径
+ * @param {string} keywordNeedle 关键词原文预筛串，为空表示不做关键词过滤
+ * @returns {Promise<any>} 解析后的日数据，文件不存在或损坏时返回 null
+ */
+async function readDayData(filePath: string, keywordNeedle: string): Promise<any> {
+  const fileStat = await stat(filePath).catch(() => null)
+  if (!fileStat) return null
+
+  const cached = dayCache.get(filePath)
+  if (cached && cached.mtimeMs === fileStat.mtimeMs && cached.size === fileStat.size) {
+    touchDayCache(filePath, cached)
+    return cached.data
+  }
+
+  let data: any
+  if (keywordNeedle) {
+    // 先按原文粗筛，未命中的文件直接跳过 JSON 解析
+    const text = await readFile(filePath, 'utf-8').catch(() => '')
+    if (!text.includes(keywordNeedle) && !text.toLowerCase().includes(keywordNeedle)) return null
+    data = JSON.parse(text)
+  } else {
+    data = await readJsonFileAsync<any>(filePath, null)
+  }
+
+  if (data) {
+    dayCache.set(filePath, { mtimeMs: fileStat.mtimeMs, size: fileStat.size, data })
+    trimDayCache()
+  }
+  return data
 }
 
 /**
@@ -94,8 +168,10 @@ export function setupHistoryIpc(deps: {
 
   ipcMain.handle('history:saveDate', (_e, date: string, data: any) => {
     assertValidDate(date)
+    const filePath = historyFilePath(getHistoryDir(), date)
     data.updatedAt = new Date().toISOString()
-    writeJsonAtomic(historyFilePath(getHistoryDir(), date), data)
+    writeJsonAtomic(filePath, data)
+    invalidateDayCache(filePath)
   })
 
   ipcMain.handle('history:batchSave', (_e, batch: Array<{ date: string; data: any }>) => {
@@ -103,8 +179,10 @@ export function setupHistoryIpc(deps: {
     const now = new Date().toISOString()
     for (const item of batch) {
       assertValidDate(item.date)
+      const filePath = historyFilePath(historyDir, item.date)
       item.data.updatedAt = now
-      writeJsonAtomic(historyFilePath(historyDir, item.date), item.data)
+      writeJsonAtomic(filePath, item.data)
+      invalidateDayCache(filePath)
     }
   })
 
@@ -113,6 +191,7 @@ export function setupHistoryIpc(deps: {
     const historyDir = getHistoryDir()
     const filePath = historyFilePath(historyDir, date)
     if (existsSync(filePath)) rmSync(filePath)
+    invalidateDayCache(filePath)
     pruneEmptyDateDirs(historyDir, date)
   })
 
@@ -130,17 +209,12 @@ export function setupHistoryIpc(deps: {
     const results = await mapWithConcurrency(dates, QUERY_CONCURRENCY, async (date) => {
       const filePath = historyFilePath(historyDir, date)
       try {
-        let data: any
-        if (kw) {
-          // 先按原文粗筛，未命中的文件直接跳过 JSON 解析
-          const text = await readFile(filePath, 'utf-8').catch(() => '')
-          if (!text.includes(needle) && !text.toLowerCase().includes(needle)) return null
-          data = JSON.parse(text)
-          data.tasks = (data.tasks || []).filter((t: any) => taskMatchesKeyword(t, kw))
-        } else {
-          data = await readJsonFileAsync<any>(filePath, null)
-        }
-        return data?.tasks?.length > 0 ? data : null
+        const raw = await readDayData(filePath, needle)
+        if (!raw?.tasks?.length) return null
+        // 复制任务数组，避免关键词过滤与排序改写缓存中的原数据
+        const data = { ...raw, tasks: [...raw.tasks] }
+        if (kw) data.tasks = data.tasks.filter((t: any) => taskMatchesKeyword(t, kw))
+        return data.tasks.length > 0 ? data : null
       } catch (e) {
         console.error('[History] 跳过损坏文件:', e)
         return null
@@ -203,6 +277,8 @@ export function setupHistoryIpc(deps: {
         // 跳过单个失败
       }
     }
+    // 恢复的文件不经过写入接口，直接整体清空缓存
+    dayCache.clear()
     return { count }
   })
 

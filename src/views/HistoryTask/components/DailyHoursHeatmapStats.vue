@@ -4,49 +4,46 @@
  * @LastEditors: Himmeltala
  * @LastEditTime: 2026-11-06 20:59:51
  * @FilePath: \src\views\HistoryTask\components\DailyHoursHeatmapStats.vue
- * @Description: 每日达标时长热力图组件，按所选时段展示每日平台自评时长是否达到 7.5 小时
+ * @Description: 每日达标时长热力图组件，按所选时段展示每日平台自评时长，7.5 小时以上按档位加深、以下按档位减淡
 -->
 <template>
   <div class="daily-hours-stats">
-    <span v-if="dataDays && !loading" class="daily-hours-summary">
-      每日目标 7.5h，达标 <strong class="hours-pass">{{ passedDays }}</strong> 天，未达标
-      <strong class="hours-fail">{{ dataDays - passedDays }}</strong> 天
-    </span>
-    <el-skeleton v-if="loading" animated class="daily-hours-skeleton">
-      <template #template>
-        <el-skeleton-item variant="rect" style="width: 100%; height: 100%; border-radius: 8px" />
-      </template>
-    </el-skeleton>
-    <el-empty v-else-if="!dataDays" description="该时段暂无任务" />
+    <el-empty v-if="!dataDays" description="该时段暂无任务" />
     <div v-else ref="chartRef" class="daily-hours-chart-body"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
-import { getGlassTooltipStyle, tooltipRow } from '@/utils/color'
+import { getLevelColor, getGlassTooltipStyle, tooltipRow } from '@/utils/color'
 import { convertIso8601ToHours } from '@/utils/parser'
-import { useLogStore } from '@/stores/log.store'
-import { ipc } from '@/utils/ipc'
+import type { HistoryDay } from '@/types/ipc'
+import type { DailyHoursItem, StatsRange } from '@/types/chart'
 
-const logStore = useLogStore()
-
-interface StatsRange {
-  start: string
-  end: string
-  calendar: number | string
-}
-
-interface DailyHoursItem {
-  value: [string, number]
-  itemStyle: { color: string }
-}
-
-// 每日达标目标小时数，达到记绿、不足记红
+// 每日达标目标小时数，达到记绿、不足记红，颜色按每 0.5 小时一档加深或减淡
 const DAILY_TARGET_HOURS = 7.5
+const HOURS_STEP = 0.5
 const PASS_COLOR = '#67c23a'
 const FAIL_COLOR = '#f56c6c'
+
+/**
+ * 计算某天时长相对目标小时数所在的档位
+ * @param {number} hours 当日平台自评时长
+ */
+function getHoursLevel(hours: number): number {
+  const offset = (hours - DAILY_TARGET_HOURS) / HOURS_STEP
+  return hours >= DAILY_TARGET_HOURS ? Math.floor(offset) : Math.ceil(offset)
+}
+
+/**
+ * 根据是否为达标日与档位取热力格颜色
+ * @param {number} hours 当日平台自评时长
+ */
+function getHoursColor(hours: number): string {
+  const passed = hours >= DAILY_TARGET_HOURS
+  return getLevelColor(passed ? PASS_COLOR : FAIL_COLOR, getHoursLevel(hours))
+}
 
 /**
  * 获取抽屉表面颜色，用作热力格间隙颜色
@@ -57,51 +54,32 @@ function getCellGapColor(): string {
   return surface || (isDarkTheme() ? '#1d1e1f' : '#ffffff')
 }
 
-const props = defineProps<{ range: StatsRange }>()
-const loading = ref(false)
-const dailyHours = ref<DailyHoursItem[]>([])
+const props = defineProps<{ range: StatsRange; days: HistoryDay[] }>()
 const chartRef = ref<HTMLDivElement | null>(null)
 
+// 由父组件统一下发历史数据，这里按日汇总平台自评时长并判定是否达标
+const dailyHours = computed<DailyHoursItem[]>(() =>
+  (props.days || [])
+    .filter((day) => day.tasks.length > 0)
+    .map((day) => {
+      const hours =
+        Math.round(
+          day.tasks.reduce((sum, task) => sum + convertIso8601ToHours(task.remote?.estimatedTime || ''), 0) * 100,
+        ) / 100
+      return {
+        value: [day.date, hours] as [string, number],
+        itemStyle: { color: getHoursColor(hours) },
+      }
+    }),
+)
+
 const dataDays = computed(() => dailyHours.value.length)
-const passedDays = computed(() => dailyHours.value.filter((item) => item.value[1] >= DAILY_TARGET_HOURS).length)
-
-/**
- * 拉取选中时段的历史数据，按日汇总平台自评时长并判定是否达标
- */
-async function loadDailyHours() {
-  loading.value = true
-  try {
-    const days = await ipc.queryHistory({
-      startDate: props.range.start,
-      endDate: props.range.end,
-    })
-    dailyHours.value = days
-      .filter((day) => day.tasks.length > 0)
-      .map((day) => {
-        const hours =
-          Math.round(
-            day.tasks.reduce((sum, task) => sum + convertIso8601ToHours(task.remote?.estimatedTime || ''), 0) * 100,
-          ) / 100
-        return {
-          value: [day.date, hours] as [string, number],
-          itemStyle: { color: hours >= DAILY_TARGET_HOURS ? PASS_COLOR : FAIL_COLOR },
-        }
-      })
-  } catch (e: any) {
-    logStore.addLog('error', '达标时长热力图数据加载失败: ' + (e?.message || e))
-    dailyHours.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-watch(() => props.range, loadDailyHours, { immediate: true })
 
 useChartRoll({
   chartRef,
   dataSource: dailyHours,
   xAxis: () => [],
-  generateOption: (data: any) => {
+  generateOption: (data: DailyHoursItem[]) => {
     if (!data || !data.length) return {}
     const isYear = typeof props.range.calendar === 'number'
     const colors = getThemeTextColors()
@@ -119,7 +97,7 @@ useChartRoll({
         formatter: (params: any) => {
           const hours: number = params.value[1]
           const passed = hours >= DAILY_TARGET_HOURS
-          const color = passed ? PASS_COLOR : FAIL_COLOR
+          const color = getHoursColor(hours)
           return `<div style="margin-bottom:4px;font-weight:600;">${params.value[0]}</div>${tooltipRow(color, `当日时长: ${hours}h`)}${tooltipRow(color, `达标: ${passed ? '是' : '否'}（目标 ${DAILY_TARGET_HOURS}h）`)}`
         },
         appendToBody: true,
@@ -159,21 +137,6 @@ useChartRoll({
   flex: 1;
   min-height: 0;
   gap: var(--app-space-2);
-}
-.daily-hours-summary {
-  font-size: var(--el-font-size-small);
-  color: var(--el-text-color-secondary);
-  flex-shrink: 0;
-}
-.daily-hours-summary .hours-pass {
-  color: var(--el-color-success);
-}
-.daily-hours-summary .hours-fail {
-  color: var(--el-color-danger);
-}
-.daily-hours-skeleton {
-  flex: 1;
-  min-height: 0;
 }
 .daily-hours-chart-body {
   width: 100%;

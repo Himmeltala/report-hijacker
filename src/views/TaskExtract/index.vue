@@ -172,10 +172,11 @@ import { Document, CopyDocument, Delete, Collection, Connection } from '@element
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
 import { useModal } from '@/composables/useModal'
-import { reviewBatch, type TaskToValidate } from '@/services/taskValidation'
+import { reviewBatch, toTaskToValidate, type TaskToValidate } from '@/services/taskValidation'
 import { mergeTasksIntoHistory } from '@/services/historyPersistence'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
-import type { TaskDetailResult } from '@/types/task'
+import { getErrorMessage } from '@/utils/error'
+import type { TaskDetailResult, TaskItem } from '@/types/task'
 import type { HistoryTaskItem } from '@/types/ipc'
 import { statusTagType, evaluationTagType, taskTypeTagType } from '@/utils/tag'
 import ParseInput from '@/components/ParseInput.vue'
@@ -183,17 +184,8 @@ import StatusBar from '@/views/TaskExtract/components/StatusBar.vue'
 // #endregion
 
 // #region 类型定义
-interface ExtractTaskItem {
-  rawSeq: string
-  rawProjectName: string
-  rawTitle: string
-  rawHandler: string
-  rawUrl: string
-  rawScore: string
-  rawEstimatedHours: string
-  rawRemark: string
-  rawText: string
-}
+// 提取页的任务即解析结果去掉行号，字段定义复用 TaskItem
+type ExtractTaskItem = Omit<TaskItem, 'lineNumber'>
 // #endregion
 
 // #region Stores
@@ -379,15 +371,7 @@ async function handleSync() {
   const epoch = parseEpoch
 
   try {
-    const ttv: TaskToValidate[] = tasks.map((t) => ({
-      rawSeq: t.rawSeq,
-      rawProjectName: t.rawProjectName,
-      rawTitle: t.rawTitle,
-      rawScore: t.rawScore,
-      rawEstimatedHours: t.rawEstimatedHours,
-      rawRemark: t.rawRemark,
-      rawUrl: t.rawUrl,
-    }))
+    const ttv: TaskToValidate[] = tasks.map(toTaskToValidate)
 
     const outcomes = await reviewBatch(
       ttv,
@@ -454,12 +438,12 @@ function handleCopy() {
 // #endregion
 
 // #region 函数式弹窗与保存历史
-const saveModal = useModal({
+const saveModal = useModal<{ taskCount: number; defaultDate: string }, { confirm: (date: string) => void }>({
   component: () => import('@/views/TaskExtract/modals/SaveHistoryModal.vue'),
   autoCloseEvents: ['close', 'cancel', 'confirm'],
 })
 
-const detailModal = useModal({
+const detailModal = useModal<{ result: TaskDetailResult | null; aiConclusion?: string | null }>({
   component: () => import('@/modals/TaskDetailModal.vue'),
   autoCloseEvents: ['close'],
 })
@@ -529,8 +513,8 @@ async function doSaveHistory(dateStr: string) {
     const added = await mergeTasksIntoHistory(dateStr, tasks)
     logStore.addLog('success', `已保存到历史: 新增 ${added} 条`)
     logStore.addLog('info', `保存历史任务: ${dateStr} (${tasks.length} 条)`)
-  } catch (e: any) {
-    logStore.addLog('error', '保存失败: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '保存失败: ' + getErrorMessage(e))
     logStore.addLog('error', '保存历史任务失败')
   }
 }

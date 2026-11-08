@@ -137,7 +137,9 @@ import { ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { useSettingsStore, SETTING_KEY_MAP_REVERSE } from '@/stores/settings.store'
 import { useLogStore } from '@/stores/log.store'
+import { getErrorMessage } from '@/utils/error'
 import RegexTester from '@/components/RegexTester.vue'
+import type { SettingsField, SettingsSchema } from '@/types/settings'
 import UpdatePanel from '@/components/UpdatePanel.vue'
 
 const props = defineProps<{ visible: boolean }>()
@@ -148,10 +150,10 @@ const logStore = useLogStore()
 
 const localVisible = ref(false)
 const activeCategory = ref('connection')
-const categories = ref<any[]>([])
+const categories = ref<SettingsSchema>([])
 const settingValues = ref<Record<string, any>>({})
 
-function isVisible(setting: any): boolean {
+function isVisible(setting: SettingsField): boolean {
   if (!setting.depends_on) return true
   const parentVal = settingValues.value[setting.depends_on]
   const expected = setting.depends_value !== undefined ? setting.depends_value : true
@@ -176,7 +178,7 @@ async function loadSchema() {
     if (schema && schema.length > 0) {
       categories.value = schema
     }
-    const allSettings: Array<{ key: string; default: any }> = []
+    const allSettings: Array<{ key: string; default: unknown }> = []
     for (const cat of categories.value) {
       for (const group of cat.groups) {
         for (const setting of group.settings) {
@@ -196,8 +198,8 @@ async function loadSchema() {
         ;(store.config as any)[configKey] = val
       }
     }
-  } catch (e: any) {
-    logStore.addLog('error', '设置配置加载失败: ' + (e?.message || e))
+  } catch (e) {
+    logStore.addLog('error', '设置配置加载失败: ' + getErrorMessage(e, String(e)))
   }
 }
 
@@ -230,8 +232,8 @@ async function onChange(key: string, value: any) {
     }
     // 日志面板相关设置修改后即时生效，无需重启
     syncLogStoreSettings()
-  } catch (e: any) {
-    logStore.addLog('error', '保存设置失败: ' + (e.message || ''))
+  } catch (e) {
+    logStore.addLog('error', '保存设置失败: ' + getErrorMessage(e))
   }
 }
 
@@ -335,7 +337,7 @@ async function handleReset() {
     return
   }
 
-  const resetEntries: Array<{ key: string; def: any; configKey?: string }> = []
+  const resetEntries: Array<{ key: string; def: unknown; configKey?: string }> = []
   for (const cat of categories.value) {
     for (const group of cat.groups) {
       for (const setting of group.settings) {

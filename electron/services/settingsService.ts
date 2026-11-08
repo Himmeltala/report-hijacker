@@ -12,6 +12,7 @@ import type { BrowserWindow } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { readJsonFile, sendToWindow, writeJsonAtomic } from '@electron/utils'
 import { pickOpenPath, pickSavePath } from '@electron/services/fileService'
+import type { SettingsSchema } from '@/types/settings'
 
 // #region 常量
 
@@ -43,7 +44,7 @@ export class AppSettings {
     this.data = {}
     if (!existsSync(this.schemaPath)) return
     try {
-      const schema = JSON.parse(readFileSync(this.schemaPath, 'utf-8'))
+      const schema: SettingsSchema = JSON.parse(readFileSync(this.schemaPath, 'utf-8'))
       for (const cat of schema) {
         for (const group of cat.groups || []) {
           for (const setting of group.settings || []) {

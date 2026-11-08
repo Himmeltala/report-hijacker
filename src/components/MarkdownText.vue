@@ -24,6 +24,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import { ipc } from '@/utils/ipc'
+import { getErrorMessage } from '@/utils/error'
 
 const props = defineProps<{
   text?: string | null
@@ -251,7 +252,7 @@ async function copyImage() {
     const dataBase64 = await blobToBase64(await svgToPngBlob(svg as SVGSVGElement))
     await ipc.copyImagePng({ dataBase64 })
     ElMessage.success('流程图已复制到剪贴板')
-  } catch (e: any) {
+  } catch (e) {
     // 转 PNG 失败时兜底复制 mermaid 源码，保证仍能把图带到其他地方
     const source = mermaidSourceOf(block)
     if (source) {
@@ -263,7 +264,7 @@ async function copyImage() {
         // 兜底也失败时落到下面的统一报错
       }
     }
-    ElMessage.error('复制流程图失败：' + (e?.message || e))
+    ElMessage.error('复制流程图失败：' + getErrorMessage(e, String(e)))
   }
 }
 
@@ -282,7 +283,7 @@ async function exportPng() {
     if (!path) return
     await ipc.writeBinaryFile({ filePath: path, dataBase64 })
     ElMessage.success('已导出 ' + path)
-  } catch (e: any) {
+  } catch (e) {
     // 转 PNG 失败（如画布染污）时兜底导出 SVG 文件
     try {
       // svg 变量声明在上方 try 块内，这里从 block 重新取
@@ -295,9 +296,9 @@ async function exportPng() {
       if (!path) return
       const data = sanitizeSvgForPng(new XMLSerializer().serializeToString(svgEl))
       await ipc.writeTextFile({ filePath: path, content: data })
-      ElMessage.warning('PNG 导出失败（' + (e?.message || e) + '），已改导出 SVG 文件：' + path)
-    } catch (e2: any) {
-      ElMessage.error('导出流程图失败：' + (e?.message || e))
+      ElMessage.warning('PNG 导出失败（' + getErrorMessage(e, String(e)) + '），已改导出 SVG 文件：' + path)
+    } catch {
+      ElMessage.error('导出流程图失败：' + getErrorMessage(e, String(e)))
     }
   }
 }

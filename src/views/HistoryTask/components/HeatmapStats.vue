@@ -8,31 +8,18 @@
 -->
 <template>
   <div class="heatmap-stats">
-    <span v-if="heatmapTotal && !loading" class="heatmap-summary">共 {{ heatmapTotal }} 个任务</span>
-    <el-skeleton v-if="loading" animated class="heatmap-skeleton">
-      <template #template>
-        <el-skeleton-item variant="rect" style="width: 100%; height: 100%; border-radius: 8px" />
-      </template>
-    </el-skeleton>
-    <el-empty v-else-if="!heatmapTotal" description="该时段暂无任务" />
+    <span v-if="heatmapTotal" class="heatmap-summary">共 {{ heatmapTotal }} 个任务</span>
+    <el-empty v-if="!heatmapTotal" description="该时段暂无任务" />
     <div v-else ref="chartRef" class="heatmap-chart-body"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
 import { getGlassTooltipStyle, tooltipRow } from '@/utils/color'
-import { useLogStore } from '@/stores/log.store'
-import { ipc } from '@/utils/ipc'
-
-const logStore = useLogStore()
-
-interface StatsRange {
-  start: string
-  end: string
-  calendar: number | string
-}
+import type { HistoryDay } from '@/types/ipc'
+import type { StatsRange } from '@/types/chart'
 
 // 深浅主题均采用「低亮高深」的蓝色序列，任务数越多颜色越深
 const HEATMAP_COLORS_LIGHT = ['#cde2fb', '#86b6ef', '#3987e5', '#256abf', '#184f95', '#0d366b']
@@ -55,39 +42,21 @@ function getCellGapColor(): string {
   return surface || (isDarkTheme() ? '#1d1e1f' : '#ffffff')
 }
 
-const props = defineProps<{ range: StatsRange }>()
-const loading = ref(false)
-const heatmapData = ref<Array<[string, number]>>([])
+const props = defineProps<{ range: StatsRange; days: HistoryDay[] }>()
 const chartRef = ref<HTMLDivElement | null>(null)
 
+// 由父组件统一下发历史数据，这里只做按日聚合
+const heatmapData = computed<Array<[string, number]>>(() =>
+  (props.days || []).map((day) => [day.date, day.tasks.length] as [string, number]),
+)
+
 const heatmapTotal = computed(() => heatmapData.value.reduce((sum, item) => sum + item[1], 0))
-
-/**
- * 拉取选中时段的历史数据并聚合为每日任务数量
- */
-async function loadHeatmap() {
-  loading.value = true
-  try {
-    const days = await ipc.queryHistory({
-      startDate: props.range.start,
-      endDate: props.range.end,
-    })
-    heatmapData.value = days.map((day) => [day.date, day.tasks.length] as [string, number])
-  } catch (e: any) {
-    logStore.addLog('error', '热力图数据加载失败: ' + (e?.message || e))
-    heatmapData.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-watch(() => props.range, loadHeatmap, { immediate: true })
 
 useChartRoll({
   chartRef,
   dataSource: heatmapData,
   xAxis: () => [],
-  generateOption: (data: any, chart: any) => {
+  generateOption: (data: Array<[string, number]>, chart) => {
     if (!data || !data.length) return {}
     const counts = data.map((item: any) => item[1])
     const maxCount = Math.max(...counts, 1)
@@ -156,10 +125,6 @@ useChartRoll({
   font-size: var(--el-font-size-small);
   color: var(--el-text-color-secondary);
   flex-shrink: 0;
-}
-.heatmap-skeleton {
-  flex: 1;
-  min-height: 0;
 }
 .heatmap-chart-body {
   width: 100%;

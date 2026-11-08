@@ -34,22 +34,19 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-
-interface PriorityForm {
-  priority: 'high' | 'medium' | 'low' | null
-}
+import type { TaskPriority, TaskPriorityForm } from '@/types/history'
 
 // 弹窗内用 none 表示未设置，确认时再转回 null，便于绑定 radio
-type PriorityOption = 'high' | 'medium' | 'low' | 'none'
+type PriorityOption = TaskPriority | 'none'
 
 const props = defineProps<{
   visible: boolean
-  form: PriorityForm | null
+  form: TaskPriorityForm | null
 }>()
 
 const emit = defineEmits<{
   close: []
-  confirm: [form: PriorityForm]
+  confirm: [form: TaskPriorityForm]
   'update:visible': [value: boolean]
 }>()
 
