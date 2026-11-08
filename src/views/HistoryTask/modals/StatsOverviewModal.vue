@@ -22,7 +22,13 @@
             <el-radio-button value="year">按年</el-radio-button>
             <el-radio-button value="month">按月</el-radio-button>
           </el-radio-group>
-          <el-date-picker v-if="mode === 'year'" v-model="yearValue" type="year" :clearable="false" style="width: 110px" />
+          <el-date-picker
+            v-if="mode === 'year'"
+            v-model="yearValue"
+            type="year"
+            :clearable="false"
+            style="width: 110px"
+          />
           <el-date-picker v-else v-model="monthValue" type="month" :clearable="false" style="width: 130px" />
         </div>
         <div class="stats-pager">

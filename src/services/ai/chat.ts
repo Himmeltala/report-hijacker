@@ -1,6 +1,9 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-08
+ * @Date: 2026-11-08 16:12:36
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-11-08 18:40:00
+ * @FilePath: \src\services\ai\chat.ts
  * @Description: 渲染层 AI 通道封装：统一调用主进程通道并读取 AI 配置项
  */
 

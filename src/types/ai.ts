@@ -1,6 +1,9 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-08
+ * @Date: 2026-11-08 16:12:05
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-11-08 18:40:00
+ * @FilePath: \src\types\ai.ts
  * @Description: AI 领域类型与设置键常量，主进程与渲染层共用，避免键名散落
  */
 

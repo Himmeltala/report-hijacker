@@ -1,13 +1,16 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-08
+ * @Date: 2026-11-08 16:13:08
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-11-08 18:40:00
+ * @FilePath: \src\services\ai\promptTools.ts
  * @Description: 辅助提示词工具：把设置里的提示词注册成模型可调用的工具，并执行单次调用
  */
 
 import { AI_SETTING_KEYS } from '@/types/ai'
 import type { AiChatTool, AiChatToolCall } from '@/types/ai'
-import { aiChat } from './chat'
-import { stripCodeFence } from './prompt'
+import { aiChat } from '@/services/ai/chat'
+import { stripCodeFence } from '@/services/ai/prompt'
 import { getErrorMessage } from '@/utils/error'
 
 // #region 类型定义

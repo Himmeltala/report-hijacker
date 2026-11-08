@@ -169,20 +169,22 @@ watch(
 // 净化序列化后的 SVG，去掉会导致 canvas 染污（Tainted canvases）的外部资源引用
 // Chromium 规则：SVG 图片只要包含外部引用（http/https 地址），drawImage 后就视为跨源，toBlob 会被拒绝
 function sanitizeSvgForPng(svg: string): string {
-  return svg
-    // 外部 <image> 元素整体移除
-    .replace(/<image\b[^>]*\/?\s*>/gi, '')
-    // 外部 <link> 引用整体移除
-    .replace(/<link\b[^>]*\/?\s*>/gi, '')
-    // 样式里的 @import 外部样式表移除
-    .replace(/@import\s[^;]+;/gi, '')
-    // 样式里的 url(外部地址) 置空，保留 url() 占位不破坏 CSS 语法；data: 与 # 片段引用不受影响
-    .replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (m, q: string, url: string) =>
-      /^https?:|^\/\//i.test(url.trim()) ? 'url()' : m,
-    )
-    // href / xlink:href / src 指向外部地址的置空；# 片段引用（箭头 marker 等）与 data: 图片保留
-    .replace(/(\s(?:xlink:)?href\s*=\s*)(["'])(?:https?:|\/\/)[^"']*\2/gi, '$1$2$2')
-    .replace(/(\s(?:xlink:)?src\s*=\s*)(["'])(?:https?:|\/\/)[^"']*\2/gi, '$1$2$2')
+  return (
+    svg
+      // 外部 <image> 元素整体移除
+      .replace(/<image\b[^>]*\/?\s*>/gi, '')
+      // 外部 <link> 引用整体移除
+      .replace(/<link\b[^>]*\/?\s*>/gi, '')
+      // 样式里的 @import 外部样式表移除
+      .replace(/@import\s[^;]+;/gi, '')
+      // 样式里的 url(外部地址) 置空，保留 url() 占位不破坏 CSS 语法；data: 与 # 片段引用不受影响
+      .replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (m, q: string, url: string) =>
+        /^https?:|^\/\//i.test(url.trim()) ? 'url()' : m,
+      )
+      // href / xlink:href / src 指向外部地址的置空；# 片段引用（箭头 marker 等）与 data: 图片保留
+      .replace(/(\s(?:xlink:)?href\s*=\s*)(["'])(?:https?:|\/\/)[^"']*\2/gi, '$1$2$2')
+      .replace(/(\s(?:xlink:)?src\s*=\s*)(["'])(?:https?:|\/\/)[^"']*\2/gi, '$1$2$2')
+  )
 }
 
 // SVG 序列化后经 canvas 转 PNG，2 倍分辨率保证贴回平台后仍清晰

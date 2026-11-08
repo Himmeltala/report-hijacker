@@ -1,11 +1,14 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-08
- * @Description: 通用多轮工具调用循环：模型要求调用工具时执行并回填结果，直到模型输出最终文本
+ * @Date: 2026-11-08 16:13:02
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-11-08 18:40:00
+ * @FilePath: \src\services\ai\toolLoop.ts
+ * @Description: 通用工具调用循环：多轮请求直到模型给出结论，接口不支持工具时抛可识别错误
  */
 
 import type { AiChatMessage, AiChatTool, AiChatToolCall } from '@/types/ai'
-import { aiChat } from './chat'
+import { aiChat } from '@/services/ai/chat'
 
 // #region 常量
 

@@ -1,7 +1,10 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-08
- * @Description: AI 提示词纯函数：占位符替换、富文本转纯文本
+ * @Date: 2026-11-08 16:12:36
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-11-08 18:40:00
+ * @FilePath: \src\services\ai\prompt.ts
+ * @Description: AI 提示词工具：占位符填充、富文本转纯文本与模型输出清洗
  */
 
 // #region 常量
@@ -57,7 +60,6 @@ export function toPlainText(raw: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
-
 
 // #region 模型输出清洗
 
