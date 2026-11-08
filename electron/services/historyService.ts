@@ -16,7 +16,7 @@ import { readFile, stat } from 'fs/promises'
 import { mapWithConcurrency } from '@electron/concurrency'
 import { writeStoreValue } from '@electron/services/storeService'
 import { pickOpenPath } from '@electron/services/fileService'
-import { compareTaskOrder } from '@/services/taskOrder'
+import { compareTaskOrder, type TaskOrderFields } from '@/services/taskOrder'
 import { taskMatchesKeyword } from '@/services/taskSearch'
 import {
   assertValidDate,
@@ -25,6 +25,9 @@ import {
   pruneEmptyDateDirs,
 } from '@electron/services/historyPaths'
 import type { ApiClient } from '@electron/services/apiClient'
+import type { AppSettings } from '@electron/services/settingsService'
+import type { HistoryDay, HistoryTaskItem } from '@/types/history'
+import type { QueryHistoryParams, SyncableTask } from '@/types/ipc'
 
 function copyDirSync(src: string, dest: string): void {
   mkdirSync(dest, { recursive: true })
@@ -52,7 +55,7 @@ const DAY_CACHE_LIMIT = 366
 interface DayCacheEntry {
   mtimeMs: number
   size: number
-  data: any
+  data: HistoryDay
 }
 
 // 按文件绝对路径缓存已解析的历史日数据，mtime 与大小变化时视为失效
@@ -113,9 +116,9 @@ function performBackup(dirs: string[], getHistoryDir: () => string, getStoreDir:
  * 读取单个历史日文件，命中缓存时跳过读盘与 JSON 解析
  * @param {string} filePath 历史日文件绝对路径
  * @param {string} keywordNeedle 关键词原文预筛串，为空表示不做关键词过滤
- * @returns {Promise<any>} 解析后的日数据，文件不存在或损坏时返回 null
+ * @returns {Promise<HistoryDay | null>} 解析后的日数据，文件不存在或损坏时返回 null
  */
-async function readDayData(filePath: string, keywordNeedle: string): Promise<any> {
+async function readDayData(filePath: string, keywordNeedle: string): Promise<HistoryDay | null> {
   const fileStat = await stat(filePath).catch(() => null)
   if (!fileStat) return null
 
@@ -125,14 +128,14 @@ async function readDayData(filePath: string, keywordNeedle: string): Promise<any
     return cached.data
   }
 
-  let data: any
+  let data: HistoryDay | null
   if (keywordNeedle) {
     // 先按原文粗筛，未命中的文件直接跳过 JSON 解析
     const text = await readFile(filePath, 'utf-8').catch(() => '')
     if (!text.includes(keywordNeedle) && !text.toLowerCase().includes(keywordNeedle)) return null
     data = JSON.parse(text)
   } else {
-    data = await readJsonFileAsync<any>(filePath, null)
+    data = await readJsonFileAsync<HistoryDay | null>(filePath, null)
   }
 
   if (data) {
@@ -144,18 +147,18 @@ async function readDayData(filePath: string, keywordNeedle: string): Promise<any
 
 /**
  * 注册历史任务相关 IPC
- * @param {() => any} deps.getSettings 获取当前设置实例（档案切换后可能被替换）
+ * @param {() => AppSettings} deps.getSettings 获取当前设置实例（档案切换后可能被替换）
  */
 export function setupHistoryIpc(deps: {
   api: ApiClient
-  getSettings: () => any
+  getSettings: () => AppSettings
   getHistoryDir: () => string
   getStoreDir: () => string
   getWindow: () => BrowserWindow | null
 }): void {
   const { api, getSettings, getHistoryDir, getStoreDir, getWindow } = deps
 
-  ipcMain.handle('history:listDates', (_e, range?: { startDate?: string; endDate?: string }) => {
+  ipcMain.handle('history:listDates', (_e, range?: QueryHistoryParams) => {
     if (range?.startDate) assertValidDate(range.startDate)
     if (range?.endDate) assertValidDate(range.endDate)
     return listHistoryDates(getHistoryDir(), range).sort().reverse()
@@ -163,10 +166,10 @@ export function setupHistoryIpc(deps: {
 
   ipcMain.handle('history:getDate', (_e, date: string) => {
     assertValidDate(date)
-    return readJsonFile<any>(historyFilePath(getHistoryDir(), date), null)
+    return readJsonFile<HistoryDay | null>(historyFilePath(getHistoryDir(), date), null)
   })
 
-  ipcMain.handle('history:saveDate', (_e, date: string, data: any) => {
+  ipcMain.handle('history:saveDate', (_e, date: string, data: HistoryDay) => {
     assertValidDate(date)
     const filePath = historyFilePath(getHistoryDir(), date)
     data.updatedAt = new Date().toISOString()
@@ -174,7 +177,7 @@ export function setupHistoryIpc(deps: {
     invalidateDayCache(filePath)
   })
 
-  ipcMain.handle('history:batchSave', (_e, batch: Array<{ date: string; data: any }>) => {
+  ipcMain.handle('history:batchSave', (_e, batch: Array<{ date: string; data: HistoryDay }>) => {
     const historyDir = getHistoryDir()
     const now = new Date().toISOString()
     for (const item of batch) {
@@ -195,7 +198,7 @@ export function setupHistoryIpc(deps: {
     pruneEmptyDateDirs(historyDir, date)
   })
 
-  ipcMain.handle('history:query', async (_e, params) => {
+  ipcMain.handle('history:query', async (_e, params: QueryHistoryParams | undefined) => {
     const { startDate, endDate, keyword } = params || {}
     const historyDir = getHistoryDir()
     const kw = keyword?.trim().toLowerCase() || ''
@@ -213,7 +216,7 @@ export function setupHistoryIpc(deps: {
         if (!raw?.tasks?.length) return null
         // 复制任务数组，避免关键词过滤与排序改写缓存中的原数据
         const data = { ...raw, tasks: [...raw.tasks] }
-        if (kw) data.tasks = data.tasks.filter((t: any) => taskMatchesKeyword(t, kw))
+        if (kw) data.tasks = data.tasks.filter((t: HistoryTaskItem) => taskMatchesKeyword(t, kw))
         return data.tasks.length > 0 ? data : null
       } catch (e) {
         console.error('[History] 跳过损坏文件:', e)
@@ -221,22 +224,22 @@ export function setupHistoryIpc(deps: {
       }
     })
 
-    const days = results.filter((d): d is any => d !== null)
+    const days = results.filter((d): d is HistoryDay => d !== null)
     // 日期升序返回，日期内按平台状态与类型排序
     for (const day of days) {
-      const orderFields = (t: any) => ({
+      const orderFields = (t: HistoryTaskItem): TaskOrderFields => ({
         status: t.remote?._embedded?.status?.name,
         type: t.remote?._embedded?.type?.name,
         date: day.date,
         seq: t.rawSeq,
       })
-      day.tasks.sort((a: any, b: any) => compareTaskOrder(orderFields(a), orderFields(b)))
+      day.tasks.sort((a, b) => compareTaskOrder(orderFields(a), orderFields(b)))
     }
     return days
   })
 
   // 批量同步任务到管理平台（工作池限并发，避免大批量同步打爆平台接口）
-  ipcMain.handle('history:syncTasks', async (_e, tasks: any[], cookie: string) => {
+  ipcMain.handle('history:syncTasks', async (_e, tasks: SyncableTask[], cookie: string) => {
     return mapWithConcurrency(tasks, SYNC_CONCURRENCY, async (task) => {
       const wpId = task.serWorkPackageId || extractWpId(task.rawUrl)
       if (!wpId) {

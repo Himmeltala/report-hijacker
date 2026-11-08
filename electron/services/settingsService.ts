@@ -21,6 +21,17 @@ const COOKIE_MASK = '******'
 
 // #endregion
 
+// #region 类型定义
+
+/** 导入导出时按结构访问的敏感字段，其余顶层键仍按任意 JSON 处理 */
+interface SettingsExportShape {
+  connection?: { cookie?: string }
+  ai?: { apiKey?: string }
+  appearance?: { theme?: string }
+}
+
+// #endregion
+
 // #region AppSettings 类
 
 /**
@@ -29,7 +40,7 @@ const COOKIE_MASK = '******'
 export class AppSettings {
   private path: string
   private schemaPath: string
-  private data: Record<string, any> = {}
+  private data: Record<string, unknown> = {}
 
   constructor(settingsPath: string, schemaPath: string) {
     this.path = settingsPath
@@ -60,25 +71,26 @@ export class AppSettings {
   }
 
   // 按点号路径写入嵌套值
-  private setNested(key: string, value: any): void {
+  private setNested(key: string, value: unknown): void {
     const parts = key.split('.')
     let d = this.data
     for (let i = 0; i < parts.length - 1; i++) {
       if (!(parts[i] in d) || typeof d[parts[i]] !== 'object') {
         d[parts[i]] = {}
       }
-      d = d[parts[i]]
+      d = d[parts[i]] as Record<string, unknown>
     }
     d[parts[parts.length - 1]] = value
   }
 
-  private deepMerge(target: any, source: any): void {
+  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const key of Object.keys(source)) {
-      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      const sourceValue = source[key]
+      if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
         if (!target[key] || typeof target[key] !== 'object') target[key] = {}
-        this.deepMerge(target[key], source[key])
+        this.deepMerge(target[key] as Record<string, unknown>, sourceValue as Record<string, unknown>)
       } else {
-        target[key] = source[key]
+        target[key] = sourceValue
       }
     }
   }
@@ -89,7 +101,7 @@ export class AppSettings {
       return
     }
     try {
-      const loaded = JSON.parse(readFileSync(this.path, 'utf-8'))
+      const loaded: Record<string, unknown> = JSON.parse(readFileSync(this.path, 'utf-8'))
       this.deepMerge(this.data, loaded)
     } catch (e) {
       console.error('[Settings] 读取设置文件失败:', e)
@@ -107,44 +119,44 @@ export class AppSettings {
   /**
    * 按点号路径读取值
    * @param {string} key 设置键名
-   * @param {any} defaultVal 默认值
-   * @returns {any} 设置值
+   * @param {T} defaultVal 默认值，缺省时返回 unknown
+   * @returns {T} 设置值
    */
-  get(key: string, defaultVal?: any): any {
+  get<T = unknown>(key: string, defaultVal?: T): T {
     const parts = key.split('.')
-    let d: any = this.data
+    let d: unknown = this.data
     for (const part of parts) {
       if (d && typeof d === 'object' && part in d) {
-        d = d[part]
+        d = (d as Record<string, unknown>)[part]
       } else {
-        return defaultVal
+        return defaultVal as T
       }
     }
-    return d
+    return d as T
   }
 
   /**
    * 按点号路径写入值并持久化
    * @param {string} key 设置键名
-   * @param {any} value 设置值
+   * @param {unknown} value 设置值
    */
-  set(key: string, value: any): void {
+  set(key: string, value: unknown): void {
     this.setNested(key, value)
     this.save()
   }
 
   /**
    * 批量设置多个键值对，仅写入磁盘一次
-   * @param {Array<[string, any]>} entries 键值对列表
+   * @param {Array<[string, unknown]>} entries 键值对列表
    */
-  setBatch(entries: Array<[string, any]>): void {
+  setBatch(entries: Array<[string, unknown]>): void {
     for (const [key, value] of entries) {
       this.setNested(key, value)
     }
     this.save()
   }
 
-  exportData(): Record<string, any> {
+  exportData(): Record<string, unknown> {
     return this.data
   }
 
@@ -183,12 +195,12 @@ export function setupSettingsIpc(deps: {
   })
   // 一次性返回全部设置（点号键名扁平化），渲染端启动时避免逐个键往返
   ipcMain.handle('settings:getAll', () => {
-    const flat: Record<string, any> = {}
-    const walk = (obj: Record<string, any>, prefix: string) => {
+    const flat: Record<string, unknown> = {}
+    const walk = (obj: Record<string, unknown>, prefix: string) => {
       for (const [key, value] of Object.entries(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key
         if (value && typeof value === 'object' && !Array.isArray(value)) {
-          walk(value, fullKey)
+          walk(value as Record<string, unknown>, fullKey)
         } else {
           flat[fullKey] = value
         }
@@ -254,7 +266,7 @@ export function setupSettingsIpc(deps: {
     })
     if (!filePath) return null
     const raw = readFileSync(filePath, 'utf-8')
-    let data: any
+    let data: Record<string, unknown> & SettingsExportShape
     try {
       data = JSON.parse(raw)
     } catch {
@@ -266,14 +278,14 @@ export function setupSettingsIpc(deps: {
       data.ai = { ...data.ai, apiKey: getSettings().get('ai.apiKey', '') }
     }
     // 仅导入对象类型的顶层设置，避免损坏结构污染当前配置
-    const entries = (Object.entries(data) as Array<[string, any]>).filter(
+    const entries: Array<[string, unknown]> = Object.entries(data).filter(
       ([key, value]) =>
         key !== 'schemaPath' &&
-        value &&
+        !!value &&
         typeof value === 'object' &&
         !Array.isArray(value) &&
         // 跳过导出的脱敏 Cookie，保留当前登录态
-        !(key === 'connection' && value.cookie === COOKIE_MASK),
+        !(key === 'connection' && (value as { cookie?: string }).cookie === COOKIE_MASK),
     )
     getSettings().setBatch(entries)
     // 备份配置变更后需重启备份定时器，导入的配置才能立即生效

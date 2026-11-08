@@ -126,7 +126,7 @@ async function checkForUpdate(deps: UpdateDeps): Promise<UpdateCheckResult> {
 
 // 读取更新频率，非法值按定时检查处理
 export function readUpdateFrequency(settings: AppSettings): UpdateFrequency {
-  const value = settings.get('update.frequency', 'interval')
+  const value = settings.get<UpdateFrequency>('update.frequency', 'interval')
   return value === 'startup' || value === 'off' ? value : 'interval'
 }
 

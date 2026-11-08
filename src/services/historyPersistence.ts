@@ -7,16 +7,16 @@
  * @Description: 历史数据持久化服务：按日期归组、磁盘合并去重、孤儿文件清理
  */
 
-import type { HistoryDay, HistoryTaskItem } from '@/types/ipc'
+import type { HistoryDay, HistoryTaskItem } from '@/types/history'
 import { ipc } from '@/utils/ipc'
 
 // #region 辅助函数
 
 /** 深层克隆，处理循环引用（OpenProject remote 的 _links 自引用会使 JSON.stringify 抛异常）
- * @param {any} obj 需要克隆的对象
- * @returns {any} 克隆后的对象
+ * @param {T} obj 需要克隆的对象
+ * @returns {T} 克隆后的对象，类型与原对象一致
  */
-function safeClone(obj: any): any {
+function safeClone<T>(obj: T): T {
   const seen = new WeakSet()
   return JSON.parse(
     JSON.stringify(obj, (_key, value) => {
@@ -26,7 +26,7 @@ function safeClone(obj: any): any {
       }
       return value
     }),
-  )
+  ) as T
 }
 
 function haveSameIds(a: Set<string>, b: Set<string>): boolean {
@@ -38,11 +38,11 @@ function haveSameIds(a: Set<string>, b: Set<string>): boolean {
 }
 
 /** 生成任务比较快照，剔除日期、时间戳等不触发业务变更的字段；remote 含 _links 循环引用，无法 JSON.stringify
- * @param {any} task 任务对象
+ * @param {HistoryTaskItem} task 任务对象
  * @returns {string} 任务内容的 JSON 序列化结果
  */
-function taskSnapshot(task: any): string {
-  const copy: any = { ...task }
+function taskSnapshot(task: HistoryTaskItem): string {
+  const copy: Partial<HistoryTaskItem> = { ...task }
   delete copy.serDate
   delete copy.serCreatedAt
   delete copy.serUpdatedAt
@@ -51,13 +51,13 @@ function taskSnapshot(task: any): string {
 }
 
 /** 比较两组任务内容是否一致，按任务 ID 配对
- * @param {any[]} a 任务列表
- * @param {any[]} b 任务列表
+ * @param {HistoryTaskItem[]} a 任务列表
+ * @param {HistoryTaskItem[]} b 任务列表
  * @returns {boolean} 内容是否一致
  */
-function sameTasksContent(a: any[], b: any[]): boolean {
+function sameTasksContent(a: HistoryTaskItem[], b: HistoryTaskItem[]): boolean {
   if (a.length !== b.length) return false
-  const mapB = new Map(b.map((t: any) => [t.serId, t]))
+  const mapB = new Map(b.map((t) => [t.serId, t]))
   for (const ta of a) {
     const tb = mapB.get(ta.serId)
     if (!tb) return false
@@ -120,15 +120,15 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
   for (const day of loadedDays) {
     originalDates.add(day.date)
     for (const t of day.tasks) {
-      allTaskIds.add((t as any).serId)
+      allTaskIds.add(t.serId)
     }
   }
 
   // 按 _date 重新归组
-  const map = new Map<string, any[]>()
+  const map = new Map<string, HistoryTaskItem[]>()
   for (const day of loadedDays) {
     for (const t of day.tasks) {
-      const key = (t as any).serDate || day.date
+      const key = t.serDate || day.date
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(t)
     }
@@ -158,10 +158,10 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
   for (const day of newDays) {
     const existing = diskByDate.get(day.date)
     if (existing && existing.tasks.length > 0) {
-      const existingIds = new Set(existing.tasks.map((t: any) => t.serId))
-      const mergedIds = new Set(day.tasks.map((t: any) => t.serId))
+      const existingIds = new Set(existing.tasks.map((t) => t.serId))
+      const mergedIds = new Set(day.tasks.map((t) => t.serId))
       for (const t of existing.tasks) {
-        if (!allTaskIds.has((t as any).serId)) {
+        if (!allTaskIds.has(t.serId)) {
           day.tasks.push(t)
           mergedIds.add(t.serId)
         }
@@ -180,7 +180,7 @@ export async function flushHistoryChanges(loadedDays: HistoryDay[]): Promise<His
     if (newDateSet.has(date)) continue
     const existing = diskByDate.get(date)
     if (!existing) continue
-    const remaining = existing.tasks.filter((t: any) => !allTaskIds.has(t.serId))
+    const remaining = existing.tasks.filter((t) => !allTaskIds.has(t.serId))
     if (remaining.length > 0) {
       existing.tasks = remaining
       saveBatch.push({ date, data: existing })

@@ -90,7 +90,7 @@ export interface SettingsImportResult {
 
 /** 历史同步入参，需提供工作包 ID 或可解析出 ID 的任务链接 */
 export type SyncableTask = Pick<RawTaskFields, 'rawUrl'> & {
-  serId?: string
+  serId: string
   serWorkPackageId?: string | null
 }
 
