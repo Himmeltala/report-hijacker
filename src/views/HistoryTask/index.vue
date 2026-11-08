@@ -84,22 +84,8 @@
               </el-link>
             </template>
           </el-table-column>
-          <el-table-column
-            align="center"
-            fixed="left"
-            label="文本项目"
-            min-width="150"
-            prop="rawProjectName"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            align="center"
-            fixed="left"
-            label="文本标题"
-            min-width="220"
-            prop="rawTitle"
-            show-overflow-tooltip
-          />
+          <el-table-column align="center" fixed="left" label="文本项目" min-width="150" prop="rawProjectName" />
+          <el-table-column align="center" fixed="left" label="文本标题" min-width="220" prop="rawTitle" />
           <el-table-column label="添加日期" prop="serDate" align="center" min-width="120" />
           <el-table-column label="执行优先级" align="center" min-width="100">
             <template #default="{ row }">

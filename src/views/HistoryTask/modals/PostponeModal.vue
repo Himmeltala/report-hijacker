@@ -11,7 +11,6 @@
     :model-value="visible"
     title="执行延期标记"
     width="400px"
-    top="2vh"
     :close-on-click-modal="false"
     @update:model-value="$emit('update:visible', $event)"
   >

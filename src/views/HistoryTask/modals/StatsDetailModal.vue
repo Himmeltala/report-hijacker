@@ -11,7 +11,6 @@
     :model-value="visible"
     title="统计详情"
     width="520px"
-    top="4vh"
     destroy-on-close
     @update:model-value="$emit('update:visible', $event)"
   >

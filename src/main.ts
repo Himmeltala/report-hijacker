@@ -24,7 +24,15 @@ async function bootstrap() {
   const app = createApp(App)
   const pinia = createPinia()
   app.use(pinia)
-  app.use(ElementPlus, { locale: zhCn })
+  app.use(ElementPlus, {
+    locale: zhCn,
+    // 弹窗统一开启拖拽且允许拖出视口，个别弹窗可用 :draggable="false" 关闭
+    dialog: { draggable: true, overflow: true },
+    // 表格统一溢出省略并显示 tooltip，列上无需再写 show-overflow-tooltip
+    table: { showOverflowTooltip: true },
+    // 中文按钮不自动插入空格
+    button: { autoInsertSpace: false },
+  })
   app.use(router)
 
   // 先加载配置，再挂载应用 — 确保子组件 onMounted 时 cookie 已就绪

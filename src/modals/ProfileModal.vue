@@ -12,7 +12,6 @@
     @update:model-value="emit('close')"
     title="管理用户"
     width="480"
-    top="5vh"
     :close-on-click-modal="false"
   >
     <div class="profile-list">

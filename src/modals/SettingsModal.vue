@@ -8,7 +8,7 @@
 -->
 
 <template>
-  <el-dialog v-model="localVisible" title="设置" width="50vw" top="2vh" :close-on-click-modal="false">
+  <el-dialog v-model="localVisible" title="设置" width="50vw" :close-on-click-modal="false">
     <div class="settings-layout">
       <el-menu :default-active="activeCategory" class="settings-menu" @select="activeCategory = $event">
         <el-menu-item v-for="cat in categories" :key="cat.key" :index="cat.key">

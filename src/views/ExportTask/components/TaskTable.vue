@@ -14,7 +14,7 @@
         <template #empty>
           <el-empty description="暂无数据" />
         </template>
-        <el-table-column align="center" fixed="left" label="链接" min-width="250" show-overflow-tooltip>
+        <el-table-column align="center" fixed="left" label="链接" min-width="250">
           <template #default="{ row }">
             <el-link v-if="row.rawUrl" :href="row.rawUrl" target="_blank" type="primary" underline="never">
               {{ row.rawUrl }}
@@ -22,14 +22,7 @@
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column
-          align="center"
-          fixed="left"
-          label="文本项目"
-          min-width="150"
-          prop="rawProjectName"
-          show-overflow-tooltip
-        >
+        <el-table-column align="center" fixed="left" label="文本项目" min-width="150" prop="rawProjectName">
           <template #default="{ row, $index }">
             <el-input
               v-if="editingIndex === $index"
@@ -41,14 +34,7 @@
             <span v-else class="cell-text" @dblclick="startEdit($index)">{{ row.rawProjectName }}</span>
           </template>
         </el-table-column>
-        <el-table-column
-          align="center"
-          fixed="left"
-          label="文本标题"
-          min-width="220"
-          prop="rawTitle"
-          show-overflow-tooltip
-        >
+        <el-table-column align="center" fixed="left" label="文本标题" min-width="220" prop="rawTitle">
           <template #default="{ row, $index }">
             <el-input
               v-if="editingIndex === $index"

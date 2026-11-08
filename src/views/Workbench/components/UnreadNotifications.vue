@@ -29,12 +29,12 @@
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column align="center" fixed="left" label="项目名称" min-width="150" show-overflow-tooltip>
+        <el-table-column align="center" fixed="left" label="项目名称" min-width="150">
           <template #default="{ row }">
             {{ row._projectName || row._links?.project?.title || '-' }}
           </template>
         </el-table-column>
-        <el-table-column align="center" fixed="left" label="任务描述" min-width="220" show-overflow-tooltip>
+        <el-table-column align="center" fixed="left" label="任务描述" min-width="220">
           <template #default="{ row }">
             {{ row._links?.resource?.title || '-' }}
           </template>

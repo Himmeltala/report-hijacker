@@ -54,22 +54,8 @@
               <span v-else class="text-muted">-</span>
             </template>
           </el-table-column>
-          <el-table-column
-            align="center"
-            fixed="left"
-            label="文本项目"
-            min-width="150"
-            prop="rawProjectName"
-            show-overflow-tooltip
-          />
-          <el-table-column
-            align="center"
-            fixed="left"
-            label="文本标题"
-            min-width="220"
-            prop="rawTitle"
-            show-overflow-tooltip
-          />
+          <el-table-column align="center" fixed="left" label="文本项目" min-width="150" prop="rawProjectName" />
+          <el-table-column align="center" fixed="left" label="文本标题" min-width="220" prop="rawTitle" />
           <el-table-column label="平台状态" align="center" min-width="100">
             <template #default="{ $index }">
               <el-tag

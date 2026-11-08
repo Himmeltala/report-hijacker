@@ -11,7 +11,6 @@
     :model-value="visible"
     title="限时任务"
     width="360px"
-    top="2vh"
     :close-on-click-modal="false"
     @update:model-value="$emit('update:visible', $event)"
   >

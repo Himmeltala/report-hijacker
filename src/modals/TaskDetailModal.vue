@@ -12,7 +12,6 @@
     :model-value="visible"
     title="任务详情"
     width="50vw"
-    top="2vh"
     :close-on-click-modal="false"
     @update:model-value="$emit('close')"
   >

@@ -11,7 +11,6 @@
     :model-value="visible"
     title="编辑任务"
     width="30vw"
-    top="2vh"
     :close-on-click-modal="false"
     @update:model-value="$emit('update:visible', $event)"
   >
