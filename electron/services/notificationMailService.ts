@@ -8,6 +8,8 @@
  */
 
 import { ipcMain } from 'electron'
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
 import nodemailer from 'nodemailer'
 import type { Transporter } from 'nodemailer'
 import { buildMailOptions } from '@electron/services/mailConfig'
@@ -57,6 +59,26 @@ function formatReason(e: unknown): string {
 }
 
 /**
+ * 用系统解析器把 SMTP 域名换成 IPv4 地址
+ *
+ * nodemailer 10 自己 new dns.Resolver 查 SMTP 域名，Electron 里这条 c-ares 路径常被
+ * 网络策略或 IPv6 拖到超时，报 DNS lookup 超时；这里先用 dns.lookup（走系统解析器，
+ * 与 nslookup 一致）拿到 IPv4，再让 nodemailer 连 IP，省掉它自己解析这一步
+ * @param {string} host 设置里填的 SMTP 服务器，已经是 IP 时原样返回
+ * @returns {Promise<string>} 解析出的 IPv4 地址
+ */
+async function resolveHostToIPv4(host: string): Promise<string> {
+  if (isIP(host)) return host
+  try {
+    const addresses = await lookup(host, { family: 4, all: true })
+    if (addresses.length) return addresses[0].address
+  } catch {
+    // 解析失败交给 nodemailer 自己处理，保留它原本的错误提示
+  }
+  return host
+}
+
+/**
  * 按当前配置发送一封纯文本邮件
  * @param {AppSettings} settings 当前档案的设置实例
  * @param {string} subject 邮件主题
@@ -67,12 +89,15 @@ async function sendMail(settings: AppSettings, subject: string, body: string): P
   const { options, error } = buildMailOptions(readMailSettings(settings))
   if (!options) return { success: false, reason: error }
 
+  // 连 IP 时证书里的域名对不上，用 servername 指定按配置里的域名校验证书
+  const host = await resolveHostToIPv4(options.host)
   let transporter: Transporter | null = null
   try {
     transporter = nodemailer.createTransport({
-      host: options.host,
+      host,
       port: options.port,
       secure: options.secure,
+      ...(host === options.host ? {} : { tls: { servername: options.host } }),
       auth: { user: options.user, pass: options.pass },
       connectionTimeout: CONNECTION_TIMEOUT_MS,
       greetingTimeout: CONNECTION_TIMEOUT_MS,
