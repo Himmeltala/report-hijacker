@@ -22,5 +22,5 @@
       "@schedules/*": ["./schedules/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "schedules/renderer/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "schedules/renderer/**/*.ts", "tests/**/*.ts"]
 }

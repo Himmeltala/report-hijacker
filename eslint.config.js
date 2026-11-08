@@ -73,6 +73,14 @@ export default tseslint.config(
     },
   },
 
+  // 测试目录：测试文件由测试运行器按路径加载，不做文件引用检查
+  {
+    files: ['tests/**/*.ts'],
+    rules: {
+      'local/no-unused-files': 'off',
+    },
+  },
+
   // 通用规则
   {
     rules: {
