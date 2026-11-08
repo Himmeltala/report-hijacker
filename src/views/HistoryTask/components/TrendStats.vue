@@ -2,18 +2,21 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 23:53:26
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-29 00:54:54
+ * @LastEditTime: 2026-11-08 17:56:00
  * @FilePath: /src/views/HistoryTask/components/TrendStats.vue
  * @Description: 趋势统计组件，按所选时段展示各文本项目任务数量的走势
 -->
 <template>
   <div class="trend-stats">
-    <div ref="trendRef" class="trend-stats-body"></div>
+    <ChartExportFrame @export="exportChart">
+      <div ref="trendRef" class="trend-stats-body"></div>
+    </ChartExportFrame>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import ChartExportFrame from '@/components/ChartExportFrame.vue'
 import { useChartRoll, getThemeTextColors, isDarkTheme } from '@/composables/useEcharts'
 import { createAreaGradient, getGlassTooltipStyle, tooltipRow } from '@/utils/color'
 import type { HistoryDay } from '@/types/ipc'
@@ -88,7 +91,7 @@ const trendData = computed<TrendData>(() => {
   return { dates, series }
 })
 
-useChartRoll({
+const { getDataURL } = useChartRoll({
   chartRef: trendRef,
   dataSource: trendData,
   xAxis: (data: TrendData) => data.dates,
@@ -155,6 +158,10 @@ useChartRoll({
   },
   maxLength: -1,
 })
+// 导出当前图表为 PNG，文件名带上统计区间，便于区分不同时段
+function exportChart(): void {
+  getDataURL({ title: `任务趋势-${props.range.calendar}` })
+}
 </script>
 
 <style scoped>

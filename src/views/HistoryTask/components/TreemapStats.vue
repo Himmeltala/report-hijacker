@@ -2,19 +2,22 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 01:12:17
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-28 12:14:04
+ * @LastEditTime: 2026-11-08 17:56:00
  * @FilePath: /src/views/HistoryTask/components/TreemapStats.vue
  * @Description: 矩阵树形统计组件，按所选时段展示各文本项目的任务数量占比
 -->
 <template>
   <div class="treemap-stats">
     <el-empty v-if="!treemapData.length" description="该时段暂无任务" />
-    <div v-else ref="treemapRef" class="treemap-stats-body"></div>
+    <ChartExportFrame v-else @export="exportChart">
+      <div ref="treemapRef" class="treemap-stats-body"></div>
+    </ChartExportFrame>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import ChartExportFrame from '@/components/ChartExportFrame.vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
 import { getGlassTooltipStyle, tooltipRow } from '@/utils/color'
 import type { HistoryDay } from '@/types/ipc'
@@ -50,7 +53,7 @@ const treemapData = computed<ProjectShareItem[]>(() => {
   return Array.from(countMap, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
 })
 
-useChartRoll({
+const { getDataURL } = useChartRoll({
   chartRef: treemapRef,
   dataSource: treemapData,
   xAxis: () => [],
@@ -106,6 +109,10 @@ useChartRoll({
   },
   maxLength: -1,
 })
+// 导出当前图表为 PNG，文件名带上统计区间，便于区分不同时段
+function exportChart(): void {
+  getDataURL({ title: `项目任务分布-${props.range.calendar}` })
+}
 </script>
 
 <style scoped>

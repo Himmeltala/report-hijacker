@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 08:54:08
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 11:52:00
+ * @LastEditTime: 2026-11-08 18:02:00
  * @FilePath: \src\views\HistoryTask\index.vue
  * @Description: 历史任务页面
 -->
@@ -263,7 +263,8 @@ import { flushHistoryChanges } from '@/services/historyPersistence'
 import { compareTaskOrder, type TaskOrderFields } from '@/services/taskOrder'
 import { taskMatchesKeyword } from '@/services/taskSearch'
 import { convertIso8601ToHours, formatIso8601Duration } from '@/utils/parser'
-import { maybeShowSysNotification } from '@/utils/sysNotification'
+import { maybeShowSysNotification } from '@/utils/notificationWindows'
+import { maybeSendMailNotification } from '@/utils/notificationMail'
 import { ipc } from '@/utils/ipc'
 import { getErrorMessage } from '@/utils/error'
 import { createAutoSyncSchedule } from '@schedules/renderer/autoSyncSchedule'
@@ -1244,6 +1245,11 @@ async function handleAiReviewSelected(tasksSnapshot?: HistoryTaskItem[]) {
           'AI 审查完成',
           buildCheckNotifyBody(res.passed, res.failed, items.length),
         )
+        await maybeSendMailNotification(
+          'mail.onCheckCompleted',
+          '[日报工具] AI 审查完成',
+          buildCheckNotifyBody(res.passed, res.failed, items.length),
+        )
       }
     }
   } finally {
@@ -1267,6 +1273,11 @@ async function handleAiReviewRange() {
         await maybeShowSysNotification(
           'notification.onCheckCompleted',
           'AI 审查完成',
+          buildCheckNotifyBody(res.passed, res.failed, items.length),
+        )
+        await maybeSendMailNotification(
+          'mail.onCheckCompleted',
+          '[日报工具] AI 审查完成',
           buildCheckNotifyBody(res.passed, res.failed, items.length),
         )
       }
@@ -1395,6 +1406,11 @@ async function handleSync() {
       await maybeShowSysNotification(
         'notification.onSyncCompleted',
         '同步完成',
+        buildSyncNotifyBody(synced, tasks.length),
+      )
+      await maybeSendMailNotification(
+        'mail.onSyncCompleted',
+        '[日报工具] 同步完成',
         buildSyncNotifyBody(synced, tasks.length),
       )
     } else {

@@ -72,6 +72,18 @@ export interface SysNotificationResult {
   reason?: string
 }
 
+/** 邮件通知参数 */
+export interface MailSendParams {
+  subject: string
+  body: string
+}
+
+/** 邮件通知结果，reason 说明发送失败的原因（已截断，便于直接展示） */
+export interface MailSendResult {
+  success: boolean
+  reason?: string
+}
+
 /** 主进程菜单事件 */
 export interface MenuEventPayload {
   action: string
@@ -224,6 +236,11 @@ export interface IpcApi {
   markNotificationsRead: (params: MarkNotificationsReadParams) => Promise<NotificationMutationResult>
 
   showSysNotification: (params: SysNotificationParams) => Promise<SysNotificationResult>
+
+  // 邮件通知：按设置里的 SMTP 配置发送到指定邮箱
+  sendMailNotification: (params: MailSendParams) => Promise<MailSendResult>
+  // 用当前邮件配置发送一封测试邮件
+  sendTestMail: () => Promise<MailSendResult>
 
   openFile: (params: OpenFileParams) => Promise<string | null>
   saveFile: (params: SaveFileParams) => Promise<string | null>

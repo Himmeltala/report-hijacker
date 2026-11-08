@@ -2,35 +2,37 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 01:12:08
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-28 12:14:04
+ * @LastEditTime: 2026-11-08 17:56:00
  * @FilePath: /src/views/HistoryTask/components/HeatmapStats.vue
- * @Description: 热力图统计组件，按所选时段展示每日任务数量分布
+ * @Description: 任务数热力图组件，按所选时段展示每日任务数量分布，沿用蓝色档位配色，任务越多颜色越深
 -->
 <template>
   <div class="heatmap-stats">
     <span v-if="heatmapTotal" class="heatmap-summary">共 {{ heatmapTotal }} 个任务</span>
     <el-empty v-if="!heatmapTotal" description="该时段暂无任务" />
-    <div v-else ref="chartRef" class="heatmap-chart-body"></div>
+    <ChartExportFrame v-else @export="exportChart">
+      <div ref="chartRef" class="heatmap-chart-body"></div>
+    </ChartExportFrame>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import ChartExportFrame from '@/components/ChartExportFrame.vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
-import { getGlassTooltipStyle, tooltipRow } from '@/utils/color'
+import { getGlassTooltipStyle, getHeatmapStageColor, tooltipRow } from '@/utils/color'
 import type { HistoryDay } from '@/types/ipc'
 import type { StatsRange } from '@/types/chart'
 
-// 深浅主题均采用「低亮高深」的蓝色序列，任务数越多颜色越深
-const HEATMAP_COLORS_LIGHT = ['#cde2fb', '#86b6ef', '#3987e5', '#256abf', '#184f95', '#0d366b']
-const HEATMAP_COLORS_DARK = ['#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#104281']
+// 中间档对应的任务数，每 1 个任务一档：少于 2 个任务颜色变浅、多于 2 个任务颜色加深
+const MIDDLE_STAGE_TASKS = 2
 
 /**
- * 获取当前主题下的热力图配色序列
- * @returns 按热度由低到高的颜色数组
+ * 按当日任务数取热力格颜色，沿用每日时长热力图的蓝色档位配色
+ * @param {number} count 当日任务数
  */
-function getHeatmapColors(): string[] {
-  return isDarkTheme() ? HEATMAP_COLORS_DARK : HEATMAP_COLORS_LIGHT
+function getTaskColor(count: number): string {
+  return getHeatmapStageColor(count - MIDDLE_STAGE_TASKS, isDarkTheme())
 }
 
 /**
@@ -52,14 +54,12 @@ const heatmapData = computed<Array<[string, number]>>(() =>
 
 const heatmapTotal = computed(() => heatmapData.value.reduce((sum, item) => sum + item[1], 0))
 
-useChartRoll({
+const { getDataURL } = useChartRoll({
   chartRef,
   dataSource: heatmapData,
   xAxis: () => [],
   generateOption: (data: Array<[string, number]>, chart) => {
     if (!data || !data.length) return {}
-    const counts = data.map((item: any) => item[1])
-    const maxCount = Math.max(...counts, 1)
     const isYear = typeof props.range.calendar === 'number'
     const colors = getThemeTextColors()
     // 根据容器高度计算每格高度，保证热力图撑满容器
@@ -74,16 +74,10 @@ useChartRoll({
       tooltip: {
         ...getGlassTooltipStyle(isDarkTheme()),
         formatter: (params: any) => {
-          const color = params.color?.colorStops ? params.color.colorStops[0]?.color : params.color
-          return `<div style="margin-bottom:4px;font-weight:600;">${params.value[0]}</div>${tooltipRow(color, `任务数: ${params.value[1]}`)}`
+          const count: number = params.value[1]
+          return `<div style="margin-bottom:4px;font-weight:600;">${params.value[0]}</div>${tooltipRow(getTaskColor(count), `任务数: ${count}`)}`
         },
         appendToBody: true,
-      },
-      visualMap: {
-        show: false,
-        min: 0,
-        max: maxCount,
-        inRange: { color: getHeatmapColors() },
       },
       calendar: {
         top: topOffset,
@@ -102,7 +96,7 @@ useChartRoll({
         {
           type: 'heatmap',
           coordinateSystem: 'calendar',
-          data,
+          data: data.map(([date, count]) => ({ value: [date, count], itemStyle: { color: getTaskColor(count) } })),
           animationDurationUpdate: 600,
           animationEasingUpdate: 'cubicInOut',
         },
@@ -111,6 +105,10 @@ useChartRoll({
   },
   maxLength: -1,
 })
+// 导出当前图表为 PNG，文件名带上统计区间，便于区分不同时段
+function exportChart(): void {
+  getDataURL({ title: `任务数热力图-${props.range.calendar}` })
+}
 </script>
 
 <style scoped>

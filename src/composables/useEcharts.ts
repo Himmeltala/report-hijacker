@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 09:46:10
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-08 17:50:00
+ * @LastEditTime: 2026-11-08 17:56:00
  * @FilePath: \..\\src\\composables\\useEcharts.ts
  * @Description: ECharts 图表控制器，负责主题跟随、数据轮播与尺寸自适应
  */
@@ -373,7 +373,8 @@ function useChartRoll<T>({
     const picbase64 = chart.getDataURL({
       type: 'png',
       pixelRatio: 2,
-      backgroundColor: '#fff',
+      // 导出底色跟随主题，避免深色图表贴在白底上看不清
+      backgroundColor: isDarkTheme() ? '#1d1e1f' : '#ffffff',
       ...option,
     })
     const link = document.createElement('a')

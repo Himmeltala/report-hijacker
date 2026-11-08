@@ -2,30 +2,31 @@
  * @Author: Himmeltala
  * @Date: 2026-11-06 20:59:51
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-06 20:59:51
+ * @LastEditTime: 2026-11-08 17:56:00
  * @FilePath: \src\views\HistoryTask\components\DailyHoursHeatmapStats.vue
- * @Description: 每日达标时长热力图组件，按所选时段展示每日平台自评时长，7.5 小时以上按档位加深、以下按档位减淡
+ * @Description: 每日达标时长热力图组件，按所选时段展示每日平台自评时长，沿用任务数热力图的蓝色系，7.5 小时以上按档位加深、以下按档位减淡
 -->
 <template>
   <div class="daily-hours-stats">
     <el-empty v-if="!dataDays" description="该时段暂无任务" />
-    <div v-else ref="chartRef" class="daily-hours-chart-body"></div>
+    <ChartExportFrame v-else @export="exportChart">
+      <div ref="chartRef" class="daily-hours-chart-body"></div>
+    </ChartExportFrame>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import ChartExportFrame from '@/components/ChartExportFrame.vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
-import { getLevelColor, getGlassTooltipStyle, tooltipRow } from '@/utils/color'
+import { getGlassTooltipStyle, getHeatmapStageColor, tooltipRow } from '@/utils/color'
 import { convertIso8601ToHours } from '@/utils/parser'
 import type { HistoryDay } from '@/types/ipc'
 import type { DailyHoursItem, StatsRange } from '@/types/chart'
 
-// 每日达标目标小时数，达到记绿、不足记红，颜色按每 0.5 小时一档加深或减淡
+// 每日达标目标小时数，颜色沿用任务数热力图的蓝色序列：达标后按档位加深、不足按档位减淡
 const DAILY_TARGET_HOURS = 7.5
 const HOURS_STEP = 0.5
-const PASS_COLOR = '#67c23a'
-const FAIL_COLOR = '#f56c6c'
 
 /**
  * 计算某天时长相对目标小时数所在的档位
@@ -37,12 +38,11 @@ function getHoursLevel(hours: number): number {
 }
 
 /**
- * 根据是否为达标日与档位取热力格颜色
+ * 根据档位取热力格颜色：刚好达标取蓝色序列中间色，档位越高越深、越低越浅
  * @param {number} hours 当日平台自评时长
  */
 function getHoursColor(hours: number): string {
-  const passed = hours >= DAILY_TARGET_HOURS
-  return getLevelColor(passed ? PASS_COLOR : FAIL_COLOR, getHoursLevel(hours))
+  return getHeatmapStageColor(getHoursLevel(hours), isDarkTheme())
 }
 
 /**
@@ -75,7 +75,7 @@ const dailyHours = computed<DailyHoursItem[]>(() =>
 
 const dataDays = computed(() => dailyHours.value.length)
 
-useChartRoll({
+const { getDataURL } = useChartRoll({
   chartRef,
   dataSource: dailyHours,
   xAxis: () => [],
@@ -128,6 +128,10 @@ useChartRoll({
   },
   maxLength: -1,
 })
+// 导出当前图表为 PNG，文件名带上统计区间，便于区分不同时段
+function exportChart(): void {
+  getDataURL({ title: `每日时长热力图-${props.range.calendar}` })
+}
 </script>
 
 <style scoped>

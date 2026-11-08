@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-15 09:54:03
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-05 10:40:00
+ * @LastEditTime: 2026-11-08 18:02:00
  * @FilePath: \electron\main.ts
  * @Description: 主进程入口：窗口、菜单、档案激活与各服务装配
  */
@@ -22,7 +22,8 @@ import {
 } from '@electron/services/profileService'
 import { setupOpenProjectIpc } from '@electron/services/openProjectService'
 import { setupAiChatIpc } from '@electron/services/aiChatService'
-import { setupSysNotificationIpc } from '@electron/services/sysNotificationService'
+import { setupSysNotificationIpc } from '@electron/services/notificationWindowsService'
+import { setupMailNotificationIpc } from '@electron/services/notificationMailService'
 import { setupExcelIpc } from '@electron/services/excelService'
 import { setupHistoryIpc } from '@electron/services/historyService'
 import { setupUpdateService } from '@electron/services/updateService'
@@ -186,6 +187,7 @@ function setupIpcHandlers(): void {
   setupOpenProjectIpc(api)
   setupAiChatIpc({ getSettings: () => settings })
   setupSysNotificationIpc(() => mainWindow)
+  setupMailNotificationIpc({ getSettings: () => settings })
   setupExcelIpc(api)
   setupHistoryIpc({
     api,

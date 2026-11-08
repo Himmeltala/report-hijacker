@@ -2,8 +2,8 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-06
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-06
- * @FilePath: \electron\services\sysNotificationService.ts
+ * @LastEditTime: 2026-11-08 18:02:00
+ * @FilePath: \electron\services\notificationWindowsService.ts
  * @Description: 系统通知服务：渲染进程请求弹出 Windows 系统通知
  */
 

@@ -28,7 +28,8 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['electron'],
+              // nodemailer 依赖 Node 内置模块与动态 require，交给运行时解析，不打进产物
+              external: ['electron', 'nodemailer'],
             },
           },
         },

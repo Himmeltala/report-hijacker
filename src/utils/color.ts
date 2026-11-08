@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 01:45:33
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-28 12:14:04
+ * @LastEditTime: 2026-11-08 17:46:00
  * @FilePath: \src\utils\color.ts
  * @Description: 颜色处理工具函数
  */
@@ -73,6 +73,38 @@ export function createAreaGradient(color: string, topAlpha = 0.6, bottomAlpha = 
       { offset: 1, color: hexToRgba(color, bottomAlpha) },
     ],
   }
+}
+
+// #endregion
+
+// #region 热力图配色
+
+// 浅色主题下「低亮高深」的蓝色序列，值越大颜色越深
+const HEATMAP_BLUE_COLORS_LIGHT = ['#cde2fb', '#86b6ef', '#3987e5', '#256abf', '#184f95', '#0d366b']
+
+// 深色主题下「低亮高深」的蓝色序列，值越大颜色越深
+const HEATMAP_BLUE_COLORS_DARK = ['#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#104281']
+
+/**
+ * 获取热力图配色序列，用于任务数、每日时长等按值深浅着色的日历热力图
+ * @param {boolean} isDark 是否为深色主题
+ * @returns {string[]} 由低到高依次加深的颜色数组
+ */
+export function getHeatmapPalette(isDark: boolean): string[] {
+  return isDark ? HEATMAP_BLUE_COLORS_DARK : HEATMAP_BLUE_COLORS_LIGHT
+}
+
+/**
+ * 按档位从热力图蓝色序列取色：档位 0 取序列中间色，正档逐档加深、负档逐档减淡，超出序列范围时取两端颜色
+ * @param {number} stage 档位偏移，0 表示中间色
+ * @param {boolean} isDark 是否为深色主题
+ * @returns {string} 对应档位的十六进制颜色
+ */
+export function getHeatmapStageColor(stage: number, isDark: boolean): string {
+  const palette = getHeatmapPalette(isDark)
+  const middleIndex = Math.floor((palette.length - 1) / 2)
+  const index = Math.min(palette.length - 1, Math.max(0, middleIndex + stage))
+  return palette[index]
 }
 
 // #endregion

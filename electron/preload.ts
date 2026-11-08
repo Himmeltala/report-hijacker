@@ -42,6 +42,8 @@ const api: IpcApi = {
 
   // #region 系统通知
   showSysNotification: (params) => ipcRenderer.invoke('sys:showNotification', params),
+  sendMailNotification: (params) => ipcRenderer.invoke('mail:send', params),
+  sendTestMail: () => ipcRenderer.invoke('mail:test'),
   // #endregion
 
   // #region 通用数据存储

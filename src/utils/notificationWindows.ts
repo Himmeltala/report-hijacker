@@ -2,8 +2,8 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-06 10:13:41
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-08-06 12:14:04
- * @FilePath: \src\utils\sysNotification.ts
+ * @LastEditTime: 2026-11-08 18:02:00
+ * @FilePath: \src\utils\notificationWindows.ts
  * @Description: 系统通知公共函数：按设置条件弹出 Windows 系统通知
  */
 

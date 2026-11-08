@@ -302,6 +302,94 @@
     ]
   },
   {
+    "key": "mail",
+    "label": "邮件通知",
+    "groups": [
+      {
+        "label": "邮件通知",
+        "settings": [
+          {
+            "key": "mail.enabled",
+            "label": "启用邮件通知",
+            "type": "checkbox",
+            "default": false,
+            "description": "同步、审查等操作完成后，把结果发送到设置里指定的邮箱"
+          },
+          {
+            "key": "mail.onSyncCompleted",
+            "label": "同步完成邮件",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "mail.enabled",
+            "description": "历史任务同步完成后发送邮件"
+          },
+          {
+            "key": "mail.onCheckCompleted",
+            "label": "审查完成邮件",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "mail.enabled",
+            "description": "AI 审查完成后发送邮件"
+          },
+          {
+            "key": "mail.smtpHost",
+            "label": "SMTP 服务器",
+            "type": "text",
+            "default": "",
+            "placeholder": "smtp.qq.com",
+            "depends_on": "mail.enabled",
+            "description": "发信邮箱的 SMTP 服务器地址，如 smtp.qq.com、smtp.163.com、smtp.exmail.qq.com"
+          },
+          {
+            "key": "mail.smtpPort",
+            "label": "SMTP 端口",
+            "type": "spinbox",
+            "default": 465,
+            "min": 1,
+            "max": 65535,
+            "step": 1,
+            "depends_on": "mail.enabled",
+            "description": "SSL 直连一般填 465，STARTTLS 一般填 587"
+          },
+          {
+            "key": "mail.secure",
+            "label": "SSL 直连",
+            "type": "checkbox",
+            "default": true,
+            "depends_on": "mail.enabled",
+            "description": "端口 465 需要开启；端口 587 通常关闭，由 STARTTLS 升级加密"
+          },
+          {
+            "key": "mail.user",
+            "label": "发件邮箱",
+            "type": "text",
+            "default": "",
+            "placeholder": "someone@qq.com",
+            "depends_on": "mail.enabled",
+            "description": "用来发信的邮箱账号，同时作为 SMTP 登录用户名"
+          },
+          {
+            "key": "mail.password",
+            "label": "密码/授权码",
+            "type": "text",
+            "default": "",
+            "depends_on": "mail.enabled",
+            "description": "SMTP 登录密码，国内邮箱一般填开启 SMTP 后生成的授权码；导出设置时自动脱敏"
+          },
+          {
+            "key": "mail.recipients",
+            "label": "收件邮箱",
+            "type": "text",
+            "default": "",
+            "placeholder": "a@x.com,b@y.com",
+            "depends_on": "mail.enabled",
+            "description": "通知接收邮箱，多个用逗号分隔"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "key": "appearance",
     "label": "系统界面",
     "groups": [

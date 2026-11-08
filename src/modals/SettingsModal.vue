@@ -115,6 +115,7 @@
                   </div>
                 </div>
               </div>
+              <MailTestPanel v-if="cat.key === 'mail'" />
               <UpdatePanel v-if="cat.key === 'update'" />
             </div>
           </template>
@@ -141,6 +142,7 @@ import { getErrorMessage } from '@/utils/error'
 import RegexTester from '@/components/RegexTester.vue'
 import type { SettingsField, SettingsSchema } from '@/types/settings'
 import UpdatePanel from '@/components/UpdatePanel.vue'
+import MailTestPanel from '@/components/MailTestPanel.vue'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [value: boolean] }>()

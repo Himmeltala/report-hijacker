@@ -27,6 +27,7 @@ const COOKIE_MASK = '******'
 interface SettingsExportShape {
   connection?: { cookie?: string }
   ai?: { apiKey?: string }
+  mail?: { password?: string }
   appearance?: { theme?: string }
 }
 
@@ -255,6 +256,10 @@ export function setupSettingsIpc(deps: {
     if (data.ai && typeof data.ai === 'object' && data.ai.apiKey) {
       data.ai = { ...data.ai, apiKey: COOKIE_MASK }
     }
+    // 邮箱授权码同样脱敏，避免发件邮箱被他人接管
+    if (data.mail && typeof data.mail === 'object' && data.mail.password) {
+      data.mail = { ...data.mail, password: COOKIE_MASK }
+    }
     writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
     return { success: true, filePath }
   })
@@ -276,6 +281,10 @@ export function setupSettingsIpc(deps: {
     // 导入时跳过导出的脱敏 AI 密钥，保留当前密钥
     if (data.ai && typeof data.ai === 'object' && data.ai.apiKey === COOKIE_MASK) {
       data.ai = { ...data.ai, apiKey: getSettings().get('ai.apiKey', '') }
+    }
+    // 邮箱授权码同理，脱敏值不覆盖当前配置
+    if (data.mail && typeof data.mail === 'object' && data.mail.password === COOKIE_MASK) {
+      data.mail = { ...data.mail, password: getSettings().get('mail.password', '') }
     }
     // 仅导入对象类型的顶层设置，避免损坏结构污染当前配置
     const entries: Array<[string, unknown]> = Object.entries(data).filter(
