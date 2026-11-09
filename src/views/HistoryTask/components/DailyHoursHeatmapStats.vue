@@ -92,6 +92,7 @@ const { getDataURL } = useChartRoll({
     const cellHeight = Math.floor(availableHeight / rows)
     return {
       backgroundColor: 'transparent',
+      visualMap: { show: false },
       tooltip: {
         ...getGlassTooltipStyle(isDarkTheme()),
         formatter: (params: any) => {

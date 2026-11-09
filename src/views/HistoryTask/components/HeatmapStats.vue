@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 01:12:08
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-08 17:56:00
+ * @LastEditTime: 2026-11-09 09:54:41
  * @FilePath: /src/views/HistoryTask/components/HeatmapStats.vue
  * @Description: 任务数热力图组件，按所选时段展示每日任务数量分布，沿用蓝色档位配色，任务越多颜色越深
 -->
@@ -71,6 +71,7 @@ const { getDataURL } = useChartRoll({
     const cellHeight = Math.floor(availableHeight / rows)
     return {
       backgroundColor: 'transparent',
+      visualMap: { show: false },
       tooltip: {
         ...getGlassTooltipStyle(isDarkTheme()),
         formatter: (params: any) => {
