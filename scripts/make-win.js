@@ -22,6 +22,13 @@ const REQUIRED_BUILD_OUTPUT = ['dist/index.html', 'dist-electron/main.js', 'dist
 // ${version} 由 electron-builder 替换成 package.json 里的版本号
 const ARTIFACT_NAME = 'report-hijacker-${version}-setup.exe'
 
+// cmd.exe 下的参数转义。项目路径可能含空格，
+// 直接拼进命令行会被拆成多个参数
+function quoteForCmd(arg) {
+  if (arg === '') return '""'
+  return /[\s"&|<>^]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg
+}
+
 /**
  * 执行子命令，失败即中断
  * @param {string} command 命令
@@ -30,11 +37,12 @@ const ARTIFACT_NAME = 'report-hijacker-${version}-setup.exe'
  */
 function run(command, args, label) {
   console.log(`[make-win] ${label}: ${command} ${args.join(' ')}`)
-  const result = spawnSync(command, args, {
+  const useShell = process.platform === 'win32'
+  const result = spawnSync(command, useShell ? args.map(quoteForCmd) : args, {
     stdio: 'inherit',
     cwd: ROOT,
     // Windows 上命令是 .cmd 垫片，需要 shell 才能解析
-    shell: process.platform === 'win32',
+    shell: useShell,
     env: {
       ...process.env,
       ELECTRON_MIRROR: MIRROR,
