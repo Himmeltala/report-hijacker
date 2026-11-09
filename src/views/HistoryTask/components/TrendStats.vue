@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-08-28 23:53:26
  * @LastEditors: zhengrenfu
- * @LastEditTime: 2026-11-08 17:56:00
+ * @LastEditTime: 2026-11-09 09:49:22
  * @FilePath: /src/views/HistoryTask/components/TrendStats.vue
  * @Description: 趋势统计组件，按所选时段展示各文本项目任务数量的走势
 -->
@@ -123,7 +123,7 @@ const { getDataURL } = useChartRoll({
         show: true,
         type: 'scroll',
         top: 10,
-        textStyle: { color: colors.secondary, fontSize: 11 },
+        textStyle: { color: colors.secondary, fontSize: 11, lineHeight: 18 },
         pageTextStyle: { color: colors.secondary },
         pageIconColor: colors.secondary,
         pageIconInactiveColor: colors.secondary,
