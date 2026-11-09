@@ -16,7 +16,7 @@ export interface AutoSyncScheduleDeps {
 }
 
 export interface AutoSyncSchedule {
-  restart: (skipImmediate?: boolean) => Promise<void>
+  restart: (skipImmediate?: boolean) => Promise<boolean>
   stop: () => void
 }
 
@@ -39,10 +39,11 @@ export function createAutoSyncSchedule(deps: AutoSyncScheduleDeps): AutoSyncSche
     }
   }
 
-  async function restart(skipImmediate = false): Promise<void> {
+  // 重启定时器，返回是否真的启动了，调用方据此更新标签状态
+  async function restart(skipImmediate = false): Promise<boolean> {
     stop()
-    if (!deps.isEligible()) return
-    if (!(await deps.isEnabled())) return
+    if (!deps.isEligible()) return false
+    if (!(await deps.isEnabled())) return false
 
     const intervalMs = Math.max(MIN_INTERVAL_MS, await deps.getIntervalMs())
     if (!skipImmediate) {
@@ -53,6 +54,7 @@ export function createAutoSyncSchedule(deps: AutoSyncScheduleDeps): AutoSyncSche
       initTimer = setTimeout(() => deps.run(), remaining <= 1_000 ? IMMEDIATE_DELAY_MS : remaining)
     }
     intervalTimer = setInterval(() => deps.run(), intervalMs)
+    return true
   }
 
   return { restart, stop }

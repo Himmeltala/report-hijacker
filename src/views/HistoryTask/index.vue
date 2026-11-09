@@ -1607,8 +1607,8 @@ function stopAutoSync() {
 
 // 重启自动同步定时器，skipImmediate 为 true 时跳过页面加载的周期判断
 async function restartAutoSync(skipImmediate = false) {
-  autoSyncEnabled.value = false
-  await autoSyncSchedule.restart(skipImmediate)
+  // 等定时器状态确定后再改标签，避免每次搜索时标签先消失再出现
+  autoSyncEnabled.value = await autoSyncSchedule.restart(skipImmediate)
 }
 // #endregion
 
