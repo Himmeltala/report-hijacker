@@ -1,21 +1,31 @@
 /*
  * @Author: zhengrenfu
  * @Date: 2026-09-24
+ * @LastEditors: zhengrenfu
+ * @LastEditTime: 2026-11-09 09:55:00
  * @FilePath: \scripts\install-electron.js
- * 描述: 安装 Electron 二进制。electron 42 起不再声明 postinstall 脚本，二进制改由首次 require 时按需下载，
- *      下载源默认指向 GitHub，当前网络不可达；pnpm 又不读取 package.json 的 config 字段，
- *      因此这里统一设置 ELECTRON_MIRROR 为国内镜像，安装与打包链路都从这里取镜像地址。
+ * @Description: 安装 Electron 二进制，下载源统一走国内镜像；已解压出对应版本时直接跳过，避免重复安装白等
  */
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ELECTRON_DIR = join(ROOT, 'node_modules', 'electron')
+const DIST_DIR = join(ELECTRON_DIR, 'dist')
 
 export const MIRROR = process.env.ELECTRON_MIRROR || 'https://cdn.npmmirror.com/binaries/electron/'
+
+// 解压好的二进制版本号，未解压或版本对不上时返回 undefined
+function installedVersion() {
+  try {
+    return readFileSync(join(DIST_DIR, 'version'), 'utf8').trim()
+  } catch {
+    return undefined
+  }
+}
 
 // 只在作为脚本直接运行时执行安装，被其他脚本导入时仅取镜像地址
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -26,6 +36,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 
   if (process.env.ELECTRON_SKIP_BINARY_DOWNLOAD === '1') {
     console.log('[install-electron] 已设置 ELECTRON_SKIP_BINARY_DOWNLOAD，跳过二进制下载')
+    process.exit(0)
+  }
+
+  // 已经解压出对应版本就不再跑 install.js：它每次都要读一遍 140 MB 的缓存包校验，
+  // 重复安装时纯属白等。版本对不上（例如升级了 electron）才重新解压。
+  const expected = JSON.parse(readFileSync(join(ELECTRON_DIR, 'package.json'), 'utf8')).version
+  if (installedVersion() === expected) {
+    console.log(`[install-electron] Electron ${expected} 二进制已就绪，跳过`)
     process.exit(0)
   }
 
