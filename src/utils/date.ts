@@ -32,4 +32,26 @@ export function addDays(d: Date, n: number): Date {
   return r
 }
 
+/**
+ * 取统计区间的自然天数，用于折算日均
+ * @param {number | string} calendar 年（number）或 YYYY-MM（string）
+ * @returns {number} 年视图返回该年天数（闰年 366），月视图返回当月天数
+ */
+export function getPeriodDays(calendar: number | string): number {
+  if (typeof calendar === 'number') return new Date(calendar, 1, 29).getMonth() === 1 ? 366 : 365
+  return new Date(Number(calendar.slice(0, 4)), Number(calendar.slice(5, 7)), 0).getDate()
+}
+
+/**
+ * 统计区日期展示文本
+ * @param {string | null} date 日期，格式 YYYY-MM-DD，无数据时传 null
+ * @param {boolean} withMonth 是否带月份，年视图为 true
+ * @returns {string} 年视图形如 9月9日，月视图形如 9日，无数据返回短横线
+ */
+export function formatStatDay(date: string | null, withMonth: boolean): string {
+  if (!date) return '—'
+  const [, month, day] = date.split('-').map(Number)
+  return withMonth ? `${month}月${day}日` : `${day}日`
+}
+
 // #endregion

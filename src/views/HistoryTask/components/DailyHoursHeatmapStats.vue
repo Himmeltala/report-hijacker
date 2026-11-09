@@ -8,6 +8,13 @@
 -->
 <template>
   <div class="daily-hours-stats">
+    <div v-if="dataDays" class="daily-hours-summary">
+      <span>总计时长：<strong>{{ hoursStats.total }}</strong> h</span>
+      <span>日均时长：<strong>{{ hoursStats.daily }}</strong> h</span>
+      <span v-if="isYearMode">月均时长：<strong>{{ hoursStats.monthly }}</strong> h</span>
+      <span>日最多时长：<strong>{{ formatStatDay(hoursStats.busiest, isYearMode) }}</strong></span>
+      <span>日最少时长：<strong>{{ formatStatDay(hoursStats.quietest, isYearMode) }}</strong></span>
+    </div>
     <el-empty v-if="!dataDays" description="该时段暂无任务" />
     <ChartExportFrame v-else @export="exportChart">
       <div ref="chartRef" class="daily-hours-chart-body"></div>
@@ -21,6 +28,7 @@ import ChartExportFrame from '@/components/ChartExportFrame.vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
 import { getGlassTooltipStyle, getHeatmapStageColor, tooltipRow } from '@/utils/color'
 import { convertIso8601ToHours } from '@/utils/parser'
+import { formatStatDay, getPeriodDays } from '@/utils/date'
 import type { HistoryDay } from '@/types/ipc'
 import type { DailyHoursItem, StatsRange } from '@/types/chart'
 
@@ -74,6 +82,43 @@ const dailyHours = computed<DailyHoursItem[]>(() =>
 )
 
 const dataDays = computed(() => dailyHours.value.length)
+
+const isYearMode = computed(() => typeof props.range.calendar === 'number')
+
+/**
+ * 统计区数据：总计、日均、月均时长与时长最多/最少的一天，只按已加载的任务日聚合
+ */
+const hoursStats = computed(() => {
+  let total = 0
+  let busiest: string | null = null
+  let quietest: string | null = null
+  let maxHours = 0
+  let minHours = Number.POSITIVE_INFINITY
+  for (const item of dailyHours.value) {
+    const [date, hours] = item.value
+    // 当日没有可统计的时长时不参与极值比较，避免“日最少”落在 0 小时上
+    if (hours <= 0) continue
+    total += hours
+    if (hours > maxHours) {
+      maxHours = hours
+      busiest = date
+    }
+    if (hours < minHours) {
+      minHours = hours
+      quietest = date
+    }
+  }
+  total = Math.round(total * 100) / 100
+  // 日均按所选区间的自然天数折算，月均只在年视图展示
+  const periodDays = getPeriodDays(props.range.calendar)
+  return {
+    total,
+    daily: periodDays ? (total / periodDays).toFixed(1) : '0.0',
+    monthly: (total / 12).toFixed(1),
+    busiest,
+    quietest,
+  }
+})
 
 const { getDataURL } = useChartRoll({
   chartRef,
@@ -142,6 +187,19 @@ function exportChart(): void {
   flex: 1;
   min-height: 0;
   gap: var(--app-space-2);
+}
+.daily-hours-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-3);
+  font-size: var(--el-font-size-small);
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+}
+.daily-hours-summary strong {
+  color: var(--el-color-primary);
+  margin: 0 2px;
 }
 .daily-hours-chart-body {
   width: 100%;

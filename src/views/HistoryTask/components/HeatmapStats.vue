@@ -8,7 +8,13 @@
 -->
 <template>
   <div class="heatmap-stats">
-    <span v-if="heatmapTotal" class="heatmap-summary">共 {{ heatmapTotal }} 个任务</span>
+    <div v-if="heatmapTotal" class="heatmap-summary">
+      <span>总计任务：<strong>{{ heatmapStats.total }}</strong> 个</span>
+      <span>日均任务：<strong>{{ heatmapStats.daily }}</strong> 个</span>
+      <span v-if="isYearMode">月均任务：<strong>{{ heatmapStats.monthly }}</strong> 个</span>
+      <span>日最多任务：<strong>{{ formatStatDay(heatmapStats.busiest, isYearMode) }}</strong></span>
+      <span>日最少任务：<strong>{{ formatStatDay(heatmapStats.quietest, isYearMode) }}</strong></span>
+    </div>
     <el-empty v-if="!heatmapTotal" description="该时段暂无任务" />
     <ChartExportFrame v-else @export="exportChart">
       <div ref="chartRef" class="heatmap-chart-body"></div>
@@ -21,6 +27,7 @@ import { ref, computed } from 'vue'
 import ChartExportFrame from '@/components/ChartExportFrame.vue'
 import { useChartRoll, isDarkTheme, getThemeTextColors } from '@/composables/useEcharts'
 import { getGlassTooltipStyle, getHeatmapStageColor, tooltipRow } from '@/utils/color'
+import { formatStatDay, getPeriodDays } from '@/utils/date'
 import type { HistoryDay } from '@/types/ipc'
 import type { StatsRange } from '@/types/chart'
 
@@ -53,6 +60,41 @@ const heatmapData = computed<Array<[string, number]>>(() =>
 )
 
 const heatmapTotal = computed(() => heatmapData.value.reduce((sum, item) => sum + item[1], 0))
+
+const isYearMode = computed(() => typeof props.range.calendar === 'number')
+
+/**
+ * 统计区数据：总计、日均、月均与任务最多/最少的一天，只按已加载的任务日聚合
+ */
+const heatmapStats = computed(() => {
+  let total = 0
+  let busiest: string | null = null
+  let quietest: string | null = null
+  let maxCount = 0
+  let minCount = Number.POSITIVE_INFINITY
+  for (const day of props.days || []) {
+    const count = day.tasks.length
+    if (count <= 0) continue
+    total += count
+    if (count > maxCount) {
+      maxCount = count
+      busiest = day.date
+    }
+    if (count < minCount) {
+      minCount = count
+      quietest = day.date
+    }
+  }
+  // 日均按所选区间的自然天数折算，月均只在年视图展示
+  const periodDays = getPeriodDays(props.range.calendar)
+  return {
+    total,
+    daily: periodDays ? (total / periodDays).toFixed(1) : '0.0',
+    monthly: (total / 12).toFixed(1),
+    busiest,
+    quietest,
+  }
+})
 
 const { getDataURL } = useChartRoll({
   chartRef,
@@ -121,9 +163,17 @@ function exportChart(): void {
   gap: var(--app-space-2);
 }
 .heatmap-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-3);
   font-size: var(--el-font-size-small);
   color: var(--el-text-color-secondary);
   flex-shrink: 0;
+}
+.heatmap-summary strong {
+  color: var(--el-color-primary);
+  margin: 0 2px;
 }
 .heatmap-chart-body {
   width: 100%;
