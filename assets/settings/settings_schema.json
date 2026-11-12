@@ -235,10 +235,10 @@
   },
   {
     "key": "notification",
-    "label": "系统通知",
+    "label": "通知设置",
     "groups": [
       {
-        "label": "通知设置",
+        "label": "系统通知",
         "settings": [
           {
             "key": "notification.enabled",

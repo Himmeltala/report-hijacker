@@ -196,9 +196,9 @@ app
     activeProfile = initProfileSystem()
 
     schemaPathForReinit = resolveFirstExisting([
-      join(app.getAppPath(), 'assets', 'settings_schema.json'),
-      join(app.getAppPath(), '..', 'assets', 'settings_schema.json'),
-      join(import.meta.dirname, '..', 'assets', 'settings_schema.json'),
+      join(app.getAppPath(), 'assets', 'settings', 'settings_schema.json'),
+      join(app.getAppPath(), '..', 'assets', 'settings', 'settings_schema.json'),
+      join(import.meta.dirname, '..', 'assets', 'settings', 'settings_schema.json'),
     ])
 
     settings = new AppSettings(getProfileSettingsPath(activeProfile), schemaPathForReinit)

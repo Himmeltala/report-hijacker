@@ -14,7 +14,7 @@ import { AI_SETTING_KEYS } from '@/types/ai'
 
 describe('AI_SETTING_KEYS', () => {
   it('每个键都能在 settings_schema.json 中找到', () => {
-    const schema = JSON.parse(readFileSync(resolve(process.cwd(), 'assets/settings_schema.json'), 'utf-8'))
+    const schema = JSON.parse(readFileSync(resolve(process.cwd(), 'assets/settings/settings_schema.json'), 'utf-8'))
     const keys = new Set<string>()
     for (const category of schema) {
       for (const group of category.groups || []) {
