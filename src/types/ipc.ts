@@ -2,12 +2,13 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-14 01:23:28
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-08 17:20:00
+ * @LastEditTime: 2026-11-12 09:32:00
  * @FilePath: \..\\src\\types\\ipc.ts
  * @Description: IPC 接口契约，渲染层与主进程共用的参数、结果类型
  */
 
 import type { AiChatParams, AiChatResult } from '@/types/ai'
+import type { AiUsageRange, AiUsageSummary } from '@/types/aiUsage'
 import type { HistoryDay } from '@/types/history'
 import type { ExcelTaskRow, RawTaskFields, TaskDetailResult } from '@/types/task'
 import type { ActivitiesResponse, NotificationsResponse } from '@/types/api'
@@ -82,11 +83,6 @@ export interface MailSendParams {
 export interface MailSendResult {
   success: boolean
   reason?: string
-}
-
-/** 主进程菜单事件 */
-export interface MenuEventPayload {
-  action: string
 }
 
 /** 设置导出结果 */
@@ -216,7 +212,6 @@ export interface IpcApi {
   exportSettings: () => Promise<SettingsExportResult>
   importSettings: () => Promise<SettingsImportResult | null>
   onThemeChanged: (callback: (theme: string) => void) => () => void
-  onMenuEvent: (callback: (data: MenuEventPayload) => void) => () => void
 
   storeGet: (key: string) => Promise<any>
   storeSet: (key: string, value: any) => Promise<void>
@@ -229,6 +224,9 @@ export interface IpcApi {
 
   // AI 通用对话（连接配置统一，传最终提示词）
   aiChat: (params: AiChatParams) => Promise<AiChatResult>
+
+  // AI token 用量汇总，range 为统计天数，0 表示全部
+  aiUsageSummary: (range: AiUsageRange) => Promise<AiUsageSummary>
 
   fetchNotifications: (params: FetchNotificationsParams) => Promise<NotificationsResponse>
   // 主进程返回 { success, data } 结构

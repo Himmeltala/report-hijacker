@@ -1,11 +1,21 @@
 /*
  * @Author: zhengrenfu
- * @Date: 2026-11-08
+ * @Date: 2026-11-08 00:00:00
+ * @LastEditors: Himmeltala
+ * @LastEditTime: 2026-11-12 09:08:04
+ * @FilePath: \electron\services\aiClient.ts
  * @Description: OpenAI 兼容 AI 客户端：读取连接配置、构造请求、归一化响应，供 IPC 与其他主进程场景复用
  */
 
 import { AI_SETTING_KEYS } from '@/types/ai'
-import type { AiChatMessage, AiChatParams, AiChatResult, AiChatTool, AiChatToolCall } from '@/types/ai'
+import type {
+  AiChatMessage,
+  AiChatParams,
+  AiChatResult,
+  AiChatTool,
+  AiChatToolCall,
+  AiTokenUsage,
+} from '@/types/ai'
 import type { AppSettings } from '@electron/services/settingsService'
 
 // #region 常量
@@ -42,6 +52,21 @@ export interface AiChatRequest {
 // #endregion
 
 // #region 工具函数
+
+// 提取响应里的 token 用量，字段缺失时按 0 计，上游未返回用量时返回 undefined
+export function toTokenUsage(raw: any): AiTokenUsage | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const toCount = (v: unknown): number => {
+    const n = Number(v)
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+  }
+  const usage = {
+    promptTokens: toCount(raw.prompt_tokens),
+    completionTokens: toCount(raw.completion_tokens),
+    totalTokens: toCount(raw.total_tokens),
+  }
+  return usage.promptTokens || usage.completionTokens || usage.totalTokens ? usage : undefined
+}
 
 // 判断是否为请求超时（AbortSignal.timeout 抛 TimeoutError）
 export function isTimeoutError(e: unknown): boolean {
@@ -142,7 +167,7 @@ export function buildChatRequest(
  * @param {AiConnectionConfig} config 连接配置
  * @param {AiChatMessage[]} messages 已归一化的消息列表
  * @param {AiChatParams} params 原始调用参数，用于读取工具定义
- * @returns {Promise<AiChatResult>} 模型输出文本、思考过程与工具调用
+ * @returns {Promise<AiChatResult>} 模型输出文本、思考过程、工具调用与 token 用量
  */
 export async function requestChatCompletion(
   config: AiConnectionConfig,
@@ -171,7 +196,7 @@ export async function requestChatCompletion(
     if (!text && !toolCalls) throw new Error('AI 未返回内容')
     // 推理模型单独返回思考过程，非推理模型为空
     const reasoning = message?.reasoning_content ? String(message.reasoning_content).trim() : ''
-    return { text, reasoning, toolCalls }
+    return { text, reasoning, toolCalls, usage: toTokenUsage(data?.usage) }
   } catch (e) {
     // 原始 TimeoutError 没有可操作信息，改成用户能照做的提示
     if (isTimeoutError(e)) {

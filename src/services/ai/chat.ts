@@ -8,6 +8,7 @@
  */
 
 import type { AiChatParams, AiChatResult } from '@/types/ai'
+import type { AiUsageRange, AiUsageSummary } from '@/types/aiUsage'
 
 // #region 通用通道
 
@@ -29,6 +30,15 @@ export async function aiChat(params: AiChatParams): Promise<AiChatResult & { rea
 export async function getAiSetting(key: string): Promise<string> {
   const val = await window.electron.getSetting<unknown>(key)
   return val === undefined || val === null ? '' : String(val)
+}
+
+/**
+ * 查询 AI token 用量汇总
+ * @param {AiUsageRange} range 统计范围，单位为天，0 表示全部
+ * @returns {Promise<AiUsageSummary>} 用量汇总结果
+ */
+export async function getAiUsageSummary(range: AiUsageRange): Promise<AiUsageSummary> {
+  return window.electron.aiUsageSummary(range)
 }
 
 // #endregion

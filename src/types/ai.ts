@@ -6,7 +6,6 @@
  * @FilePath: \src\types\ai.ts
  * @Description: AI 领域类型与设置键常量，主进程与渲染层共用，避免键名散落
  */
-
 // #region 设置键
 
 /**
@@ -82,6 +81,13 @@ export interface AiChatResult {
   reasoning?: string
   // 模型本轮要求调用的工具，为空表示对话结束
   toolCalls?: AiChatToolCall[]
+}
+
+/** 单次请求的 token 用量，对应接口响应的 usage 字段 */
+export interface AiTokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
 }
 
 // #endregion
