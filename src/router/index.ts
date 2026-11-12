@@ -14,6 +14,7 @@ import CheckTask from '@/views/CheckTask/index.vue'
 import TaskExtract from '@/views/TaskExtract/index.vue'
 import HistoryTask from '@/views/HistoryTask/index.vue'
 import Workbench from '@/views/Workbench/index.vue'
+import Settings from '@/views/Settings/index.vue'
 
 // #region 路由配置
 
@@ -55,6 +56,12 @@ const routes = [
     name: 'ExportTask',
     component: ExportTask,
     meta: { title: '导出任务' },
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
+    meta: { title: '设置' },
   },
 ]
 

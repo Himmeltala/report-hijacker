@@ -35,6 +35,10 @@
           <el-icon><EditPen /></el-icon>
           <span>导出任务</span>
         </el-menu-item>
+        <el-menu-item index="/settings">
+          <el-icon><Setting /></el-icon>
+          <span>设置</span>
+        </el-menu-item>
       </el-menu>
 
       <div class="sidebar-footer">
@@ -106,9 +110,7 @@ const profileList = ref<string[]>([])
 
 const updater = useUpdater()
 
-const settingsModal = useModal({ component: () => import('@/modals/SettingsModal.vue') })
 const profileModal = useModal({ component: () => import('@/modals/ProfileModal.vue') })
-
 async function loadProfiles() {
   try {
     currentProfile.value = await window.electron.profileCurrent()
@@ -183,10 +185,6 @@ const cleanupTheme = window.electron?.onThemeChanged?.((newTheme: string) => {
   applyTheme(newTheme)
 })
 
-const cleanupMenu = window.electron?.onMenuEvent?.(({ action }) => {
-  if (action === 'settings') settingsModal.open()
-})
-
 // 自动检查发现新版本时由主进程推送，这里负责弹窗确认
 const cleanupUpdate = window.electron?.onUpdateAvailable?.((data) => {
   logStore.addLog('info', `发现新版本 ${data.version || ''}，等待更新确认`)
@@ -253,7 +251,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   cleanupTheme?.()
-  cleanupMenu?.()
   cleanupProfile?.()
   cleanupUpdate?.()
 })

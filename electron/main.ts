@@ -4,7 +4,7 @@
  * @LastEditors: Himmeltala
  * @LastEditTime: 2026-11-08 18:02:00
  * @FilePath: \electron\main.ts
- * @Description: 主进程入口：窗口、菜单、档案激活与各服务装配
+ * @Description: 主进程入口：窗口、档案激活与各服务装配
  */
 import { app, BrowserWindow, Menu, shell, dialog } from 'electron'
 import { join } from 'path'
@@ -22,6 +22,7 @@ import {
 } from '@electron/services/profileService'
 import { setupOpenProjectIpc } from '@electron/services/openProjectService'
 import { setupAiChatIpc } from '@electron/services/aiChatService'
+import { setupAiUsageIpc } from '@electron/services/aiUsageService'
 import { setupSysNotificationIpc } from '@electron/services/notificationWindowsService'
 import { setupMailNotificationIpc } from '@electron/services/notificationMailService'
 import { setupExcelIpc } from '@electron/services/excelService'
@@ -55,42 +56,6 @@ function getHistoryDir(): string {
   const dir = join(getProfileDir(activeProfile), 'history')
   mkdirSync(dir, { recursive: true })
   return dir
-}
-// #endregion
-
-// #region 菜单
-function setupMenu(): void {
-  const getWin = () => BrowserWindow.getAllWindows()[0]
-  const send = (action: string) => {
-    const win = getWin()
-    win?.webContents.send('menu:event', { action })
-  }
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: '系统',
-      submenu: [
-        { label: '设置', click: () => send('settings') },
-        { type: 'separator' },
-        // 不带快捷键，Alt+F4 由系统处理
-        { label: '退出', role: 'quit' },
-      ],
-    },
-    {
-      label: '工具',
-      submenu: [
-        {
-          label: '开发者工具',
-          click: () => {
-            const win = getWin()
-            win?.webContents.toggleDevTools()
-          },
-        },
-      ],
-    },
-  ]
-
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
 }
 // #endregion
 
@@ -185,7 +150,8 @@ function setupIpcHandlers(): void {
   setupStoreIpc({ getStoreDir })
   setupFileIpc({ getWindow: () => mainWindow })
   setupOpenProjectIpc(api)
-  setupAiChatIpc({ getSettings: () => settings })
+  setupAiChatIpc({ getSettings: () => settings, getStoreDir })
+  setupAiUsageIpc({ getStoreDir })
   setupSysNotificationIpc(() => mainWindow)
   setupMailNotificationIpc({ getSettings: () => settings })
   setupExcelIpc(api)
@@ -238,8 +204,9 @@ app
     settings = new AppSettings(getProfileSettingsPath(activeProfile), schemaPathForReinit)
 
     setupIpcHandlers()
+    // 移除应用菜单（含「系统」「工具」子菜单），窗口顶部不再显示菜单栏
+    Menu.setApplicationMenu(null)
     createWindow()
-    setupMenu()
     restartBackupSchedule()
     restartUpdateScheduler()
   })

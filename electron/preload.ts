@@ -2,7 +2,7 @@
  * @Author: zhengrenfu
  * @Date: 2026-07-13 00:26:38
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-08 17:30:00
+ * @LastEditTime: 2026-11-12 09:32:00
  * @FilePath: \electron\preload.ts
  * @Description: 预加载脚本，通过 contextBridge 暴露 IPC 接口
  */
@@ -32,6 +32,7 @@ const api: IpcApi = {
   fetchTaskDetail: (params) => ipcRenderer.invoke('api:fetchTaskDetail', params),
   checkComments: (params) => ipcRenderer.invoke('api:checkComments', params),
   aiChat: (params) => ipcRenderer.invoke('ai:chat', params),
+  aiUsageSummary: (range) => ipcRenderer.invoke('ai:usageSummary', range),
   // #endregion
 
   // #region 通知
@@ -97,7 +98,6 @@ const api: IpcApi = {
 
   // #region 事件监听
   onThemeChanged: (callback: (theme: string) => void) => subscribe('event:themeChanged', callback),
-  onMenuEvent: (callback) => subscribe('menu:event', callback),
   onProfileSwitched: (callback: (name: string) => void) => subscribe('profile:switched', callback),
   onAutoSyncSettingsChanged: (callback: () => void) => subscribe('event:autoSyncSettingsChanged', callback),
   onBackupCompleted: (callback: () => void) => subscribe('event:backupCompleted', callback),
