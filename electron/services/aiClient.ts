@@ -49,6 +49,11 @@ export interface AiChatRequest {
   body: Record<string, unknown>
 }
 
+// 一次请求的结果，比对外结果多出 token 用量，供主进程记账
+export interface AiChatCompletionResult extends AiChatResult {
+  usage?: AiTokenUsage
+}
+
 // #endregion
 
 // #region 工具函数
@@ -167,13 +172,13 @@ export function buildChatRequest(
  * @param {AiConnectionConfig} config 连接配置
  * @param {AiChatMessage[]} messages 已归一化的消息列表
  * @param {AiChatParams} params 原始调用参数，用于读取工具定义
- * @returns {Promise<AiChatResult>} 模型输出文本、思考过程、工具调用与 token 用量
+ * @returns {Promise<AiChatCompletionResult>} 模型输出文本、思考过程、工具调用与 token 用量
  */
 export async function requestChatCompletion(
   config: AiConnectionConfig,
   messages: AiChatMessage[],
   params: AiChatParams,
-): Promise<AiChatResult> {
+): Promise<AiChatCompletionResult> {
   const { endpoint, headers, body } = buildChatRequest(config, messages, params)
   try {
     const res = await fetch(endpoint, {

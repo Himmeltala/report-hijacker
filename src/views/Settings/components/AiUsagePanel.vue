@@ -85,7 +85,7 @@ const { getDataURL } = useChartRoll({
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
         appendToBody: true,
-        formatter: (params: any[]) => {
+        formatter: (params: any) => {
           const prompt = params[0]?.value ?? 0
           const completion = params[1]?.value ?? 0
           const rows = [
