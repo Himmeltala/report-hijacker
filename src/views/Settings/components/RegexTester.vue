@@ -3,7 +3,7 @@
  * @Date: 2026-07-14 22:29:28
  * @LastEditors: zhengrenfu
  * @LastEditTime: 2026-07-14 22:29:28
- * @FilePath: \..\\src\\components\\RegexTester.vue
+ * @FilePath: \src\views\Settings\components\RegexTester.vue
  * @Description: 描述
 -->
 

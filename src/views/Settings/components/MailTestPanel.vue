@@ -3,7 +3,7 @@
  * @Date: 2026-11-08 18:26:00
  * @LastEditors: Himmeltala
  * @LastEditTime: 2026-11-08 18:26:00
- * @FilePath: \src\components\MailTestPanel.vue
+ * @FilePath: \src\views\Settings\components\MailTestPanel.vue
  * @Description: 邮件通知测试面板，用当前 SMTP 配置发送一封测试邮件，便于在设置页直接验证配置
 -->
 <template>

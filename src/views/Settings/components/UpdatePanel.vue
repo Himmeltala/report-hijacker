@@ -3,7 +3,7 @@
  * @Date: 2026-11-04 15:19:52
  * @LastEditors: Himmeltala
  * @LastEditTime: 2026-11-06 23:15:00
- * @FilePath: \src\components\UpdatePanel.vue
+ * @FilePath: \src\views\Settings\components\UpdatePanel.vue
  * @Description: 设置弹窗里的应用更新面板：当前版本、上次检查时间与手动检查入口
 -->
 
