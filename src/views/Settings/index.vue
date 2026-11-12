@@ -2,9 +2,9 @@
  * @Author: zhengrenfu
  * @Date: 2026-11-11 23:50:00
  * @LastEditors: Himmeltala
- * @LastEditTime: 2026-11-12 09:32:00
+ * @LastEditTime: 2026-11-12 11:05:00
  * @FilePath: \src\views\Settings\index.vue
- * @Description: 设置页面，左侧分类菜单支持二级页面，AI 分类下挂用量统计
+ * @Description: 设置页面，左侧菜单支持二级页面，系统通知与邮件通知归入通知设置，AI 额外挂用量统计
 -->
 
 <template>
@@ -26,32 +26,33 @@
 
     <div class="settings-body">
       <div class="settings-menu">
-        <el-scrollbar>
-          <el-menu :default-active="activeMenuKey" :default-openeds="['ai']" @select="onMenuSelect">
-            <template v-for="cat in categories" :key="cat.key">
-              <el-sub-menu v-if="subMenus[cat.key]" :index="cat.key">
-                <template #title>{{ cat.label }}</template>
-                <el-menu-item :index="cat.key">设置</el-menu-item>
-                <el-menu-item v-for="sub in subMenus[cat.key]" :key="sub.key" :index="sub.key">
+        <!-- 二级菜单展开收起会改变菜单宽度，固定住避免抖动 -->
+        <el-scrollbar class="settings-nav" :style="{ width: menuWidth }">
+          <el-menu :default-active="activeTab" :default-openeds="defaultOpeneds" @select="onMenuSelect">
+            <template v-for="menu in menuItems" :key="menu.key">
+              <el-sub-menu v-if="menu.subs.length" :index="menu.key">
+                <template #title>{{ menu.label }}</template>
+                <el-menu-item v-for="sub in menu.subs" :key="sub.key" :index="sub.key">
                   {{ sub.label }}
                 </el-menu-item>
               </el-sub-menu>
-              <el-menu-item v-else :index="cat.key">{{ cat.label }}</el-menu-item>
+              <el-menu-item v-else :index="menu.key">{{ menu.label }}</el-menu-item>
             </template>
           </el-menu>
         </el-scrollbar>
       </div>
       <el-scrollbar class="settings-content">
         <div class="settings-inner">
-          <template v-for="cat in categories" :key="cat.key">
-            <div v-if="cat.key === activeCategory" class="settings-panel">
-              <div class="settings-head">
+          <template v-for="menu in menuItems" :key="menu.key">
+            <div v-if="menu.key === activeMenu?.key" class="settings-panel">
+              <!-- 页面标题与菜单项同名时不再重复显示 -->
+              <div v-if="activePanelTitle !== activeLabel" class="settings-head">
                 <h2>{{ activePanelTitle }}</h2>
               </div>
-              <!-- 用量统计只展示图表，不重复渲染分类下的设置项 -->
-              <template v-if="activeSub === 'settings'">
-                <div v-for="group in cat.groups" :key="group.label" class="settings-group">
-                  <h3>{{ group.label }}</h3>
+              <!-- 二级页面只渲染自己的设置分组，用量统计这类页面完全由组件自渲染 -->
+              <template v-if="!isExtraPage">
+                <div v-for="group in currentGroups" :key="group.label" class="settings-group">
+                  <h3 v-if="group.label">{{ group.label }}</h3>
                   <div
                     v-for="setting in group.settings"
                     :key="setting.key"
@@ -146,10 +147,10 @@
                     </div>
                   </div>
                 </div>
-                <MailTestPanel v-if="cat.key === 'mail'" class="settings-extra" />
-                <UpdatePanel v-if="cat.key === 'update'" class="settings-extra" />
               </template>
-              <AiUsagePanel v-if="cat.key === 'ai' && activeSub === 'usage'" />
+              <MailTestPanel v-if="menu.cat === 'mail'" class="settings-extra" />
+              <UpdatePanel v-if="menu.cat === 'update'" class="settings-extra" />
+              <AiUsagePanel v-if="activeTab === 'ai:usage'" />
             </div>
           </template>
         </div>
@@ -166,7 +167,7 @@ import { useSettingsStore, SETTING_KEY_MAP_REVERSE } from '@/stores/settings.sto
 import { useLogStore } from '@/stores/log.store'
 import { getErrorMessage } from '@/utils/error'
 import RegexTester from './components/RegexTester.vue'
-import type { SettingsField, SettingsSchema } from '@/types/settings'
+import type { SettingsField, SettingsGroup, SettingsSchema } from '@/types/settings'
 import UpdatePanel from './components/UpdatePanel.vue'
 import MailTestPanel from './components/MailTestPanel.vue'
 import AiUsagePanel from './components/AiUsagePanel.vue'
@@ -174,36 +175,130 @@ import AiUsagePanel from './components/AiUsagePanel.vue'
 const store = useSettingsStore()
 const logStore = useLogStore()
 
-const activeCategory = ref('connection')
-// 二级菜单项，默认落在分类的「设置」上
-const activeSub = ref('settings')
 const categories = ref<SettingsSchema>([])
 const settingValues = ref<Record<string, any>>({})
 
-// 带二级菜单的分类，键为分类键名，值为额外挂载的页面
-const subMenus = computed<Record<string, { key: string; label: string }[]>>(() => ({
-  ai: [{ key: 'ai:usage', label: '用量统计' }],
-}))
+// 归入同一个一级菜单的分类，键为容纳它们的菜单键，值为归入的分类键
+const GROUPED_CATS: Record<string, string[]> = {
+  notification: ['notification', 'mail'],
+}
 
-// 当前选中的菜单项，二级菜单项用「分类:子项」表示
-const activeMenuKey = computed(() => (activeSub.value === 'settings' ? activeCategory.value : `${activeCategory.value}:${activeSub.value}`))
+// 分组容器菜单的名称，容器本身不直接显示设置，归入它的分类各自成为二级菜单
+const GROUPED_LABELS: Record<string, string> = {
+  notification: '通知设置',
+}
 
-// 内容区标题，二级页面取子项名称
-const activePanelTitle = computed(() => {
-  const cat = categories.value.find((c) => c.key === activeCategory.value)
-  if (!cat) return ''
-  if (activeSub.value === 'settings') return cat.label
-  return (subMenus.value[cat.key] || []).find((s) => s.key === activeMenuKey.value)?.label || cat.label
+// 一级菜单之外的子页面，内容不来自 schema 分组，由组件自己渲染
+const EXTRA_SUBS: Record<string, { key: string; label: string; cat: string }[]> = {
+  ai: [{ key: 'ai:usage', label: '用量统计', cat: 'ai' }],
+}
+
+// 下级菜单项，section 有值时只渲染来源分类里的该分组，base 表示分类自身的全部设置
+interface MenuSub {
+  key: string
+  label: string
+  cat: string
+  section?: string
+  base?: boolean
+}
+
+// 一级菜单项：归入分组容器的分类只作为容器出现，其余分类直接占一行
+interface MenuItem {
+  key: string
+  label: string
+  cat: string
+  groups: SettingsGroup[]
+  subs: MenuSub[]
+}
+
+// 由设置分类生成菜单，归入同一容器的分类合并成一项，各自成为它的二级菜单
+const menuItems = computed<MenuItem[]>(() => {
+  const list: MenuItem[] = []
+  const containers: Record<string, MenuItem> = {}
+  for (const cat of categories.value) {
+    const owner = Object.keys(GROUPED_CATS).find((key) => GROUPED_CATS[key].includes(cat.key))
+    if (owner) {
+      if (!containers[owner]) {
+        containers[owner] = {
+          key: owner,
+          label: GROUPED_LABELS[owner] || owner,
+          cat: owner,
+          groups: [],
+          subs: [],
+        }
+        list.push(containers[owner])
+      }
+      // 一个分类对应一个页面，分组名与分类名一致时只取该分组，避免与页面标题重复
+      // 子项名称取分类里的分组名，没有分组时用分类名
+      const sub: MenuSub = {
+        key: `${owner}:${cat.key}`,
+        label: cat.groups.length ? cat.groups[0].label : cat.label,
+        cat: cat.key,
+      }
+      // 分类只有一个分组时只渲染该分组，多个分组时整页渲染
+      if (cat.groups.length === 1) sub.section = cat.groups[0].label
+      containers[owner].subs.push(sub)
+      continue
+    }
+    // 分类既有自身设置又有额外页面时，第一个子项给它的全部设置
+    const extras = EXTRA_SUBS[cat.key] || []
+    const subs: MenuSub[] = extras.length ? [{ key: cat.key, label: '基础设置', cat: cat.key, base: true }, ...extras] : []
+    list.push({
+      key: cat.key,
+      label: cat.label,
+      cat: cat.key,
+      groups: cat.groups,
+      subs,
+    })
+  }
+  return list
 })
 
+// 当前页面的菜单键，一级项用分类键，二级页面用「分类:子项」
+const activeTab = ref('connection')
+
+// 当前页面所属的一级菜单项与子项，一级项自己没有子项
+const activeMenu = computed(() => {
+  const menu = menuItems.value.find((m) => m.key === activeTab.value)
+  if (menu) return menu
+  const parent = menuItems.value.find((m) => m.subs.some((sub) => sub.key === activeTab.value))
+  return parent || menuItems.value[0]
+})
+const menuSub = computed<MenuSub | undefined>(() => activeMenu.value?.subs.find((sub) => sub.key === activeTab.value))
+
+// 组件自渲染的页面，不渲染 schema 里的设置项
+const isExtraPage = computed(() => !!menuSub.value && !menuSub.value.section && !menuSub.value.base)
+
+// 当前页面在菜单里的名称
+const activeLabel = computed(() => menuSub.value?.label || activeMenu.value?.label || '')
+
+// 默认展开全部带子菜单的分类
+const defaultOpeneds = computed(() => menuItems.value.filter((m) => m.subs.length).map((m) => m.key))
+
+// 菜单宽度按最长的一级项推算，二级项缩进后的宽度加上箭头与内边距，展开收起都不变
+const menuWidth = computed(() => {
+  let longest = 0
+  for (const menu of menuItems.value) longest = Math.max(longest, menu.label.length)
+  return `${Math.max(140, longest * 15 + 112)}px`
+})
+
+// 当前页面要渲染的设置分组，二级页面只取它自己那一组
+const currentGroups = computed<SettingsGroup[]>(() => {
+  if (!menuSub.value) return activeMenu.value?.groups || []
+  const source = categories.value.find((c) => c.key === menuSub.value?.cat)?.groups || []
+  return menuSub.value.section ? source.filter((g) => g.label === menuSub.value?.section) : source
+})
+
+// 内容区标题跟随当前菜单项，一级项用它自己，二级项用子项名称
+const activePanelTitle = computed(() => menuSub.value?.label || activeMenu.value?.label || '')
+
 /**
- * 处理左侧菜单选择，二级菜单项切到对应子页面，一级菜单项回到「设置」
+ * 处理左侧菜单选择，选中的一级项没有自身设置时落到它的第一个子项
  * @param {string} key 菜单项索引
  */
 function onMenuSelect(key: string): void {
-  const [cat, sub] = key.split(':')
-  activeCategory.value = cat
-  activeSub.value = sub || 'settings'
+  const menu = menuItems.value.find((m) => m.key === key)
+  activeTab.value = menu && !menu.groups.length && menu.subs.length ? menu.subs[0].key : key
 }
 
 function isVisible(setting: SettingsField): boolean {
@@ -436,10 +531,13 @@ async function handleReset() {
   background: var(--el-bg-color-overlay);
 }
 /* 分类菜单跟随应用菜单样式，只留右侧分隔线 */
+/* 菜单栏宽度由 menuWidth 给出，随最长的一级项变化 */
 .settings-menu {
-  width: 160px;
-  min-width: 160px;
+  flex-shrink: 0;
   border-right: 1px solid var(--el-border-color);
+}
+.settings-nav {
+  height: 100%;
 }
 .settings-menu :deep(.el-menu) {
   padding: var(--app-space-1) 0;
